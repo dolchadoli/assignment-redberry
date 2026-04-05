@@ -1,25 +1,23 @@
-import { authStore } from '../../state/authStore.js';
-
 class Navbar {
   render() {
-    const isAuthenticated = authStore.isAuthenticated();
-
     return `
       <nav class="navbar">
         <div class="navbar-container">
-          <div class="navbar-logo">
-            <a href="#/">Online Courses</a>
-          </div>
+          <a href="#/" class="navbar-logo" aria-label="Go to dashboard">
+            <img src="/assets/images/Logo.png" alt="Online Courses Logo" />
+          </a>
           <div class="navbar-links">
-            <a href="#/courses">Browse Courses</a>
-            ${isAuthenticated ? `
-              <button class="btn-enrolled">Enrolled Courses</button>
-              <button class="btn-profile">Profile</button>
-              <button class="btn-logout">Logout</button>
-            ` : `
-              <button class="btn-login">Log In</button>
-              <button class="btn-signup">Sign Up</button>
-            `}
+            <a href="#/courses" class="nav-link">
+              <img src="/assets/icons/stars.png" alt="Browse Courses" />
+              <span>Browse Courses</span>
+            </a>
+            <button type="button" class="nav-link btn-enrolled">
+              <img src="/assets/icons/book.png" alt="Enrolled Courses" />
+              <span>Enrolled Courses</span>
+            </button>
+            <button type="button" class="btn-profile" aria-label="Open account menu">
+              <img src="/assets/images/Avatar.png" alt="Profile" />
+            </button>
           </div>
         </div>
       </nav>

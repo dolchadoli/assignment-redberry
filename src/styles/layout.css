@@ -14,52 +14,125 @@
 
 /* Navbar */
 .navbar {
-  background-color: #fff;
-  border-bottom: 1px solid #ddd;
-  padding: 10px 20px;
+  width: 100%;
+  height: 108px;
+  background-color: #f8f8fb;
+  border-bottom: 1px solid #e2e3ea;
+  padding: 0;
+  box-shadow: none;
 }
 
 .navbar-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
   max-width: 1920px;
+  height: 100%;
   margin: 0 auto;
+  padding: 0 72px;
 }
 
-.navbar-logo a {
-  font-size: 24px;
-  font-weight: bold;
-  text-decoration: none;
-  color: #333;
+.navbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+}
+
+.navbar-logo img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
 }
 
 .navbar-links {
   display: flex;
-  gap: 15px;
+  gap: 32px;
   align-items: center;
 }
 
 .navbar-links a,
 .navbar-links button {
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
   text-decoration: none;
-  color: #333;
-  background: none;
+  color: #474a57;
+  background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 0;
+  transition: color 0.2s ease;
 }
 
+.navbar-links a:hover,
 .navbar-links button:hover {
-  background-color: #f0f0f0;
+  color: #303242;
+}
+
+.navbar-links a img,
+.navbar-links button img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.btn-profile {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 0;
+  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-profile img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.8);
+  transform-origin: center;
+}
+
+.btn-logout {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+}
+
+.btn-login,
+.btn-signup {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+}
+
+.btn-signup {
+  background: #4f46e5;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.nav-link {
+  min-width: auto;
 }
 
 /* Footer */
 .footer {
-  background-color: #f8f8f8;
-  border-top: 1px solid #ddd;
-  padding: 20px;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  padding: 32px;
   text-align: center;
 }
 
