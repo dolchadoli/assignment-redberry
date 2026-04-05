@@ -5,27 +5,21 @@ import { uiStore } from './state/uiStore.js';
 import { logout } from './services/authService.js';
 import loginModal from './components/modals/loginModal.js';
 import registerModal from './components/modals/registerModal.js';
+import { renderDashboardPage } from './pages/dashboardPage.js';
+import { renderCatalogPage } from './pages/catalogPage.js';
+import { renderCourseDetailPage } from './pages/courseDetailPage.js';
+import { renderNotFoundPage } from './pages/notFoundPage.js';
 
-// Placeholder page handlers - will be replaced with actual page components
-const dashboardPage = (params) => {
+function setPageContent(markup) {
   const pageContent = document.getElementById('page-content');
-  pageContent.innerHTML = '<h1>Dashboard</h1><p>Welcome to the Online Courses Platform!</p>';
-};
+  if (!pageContent) return;
+  pageContent.innerHTML = markup;
+}
 
-const catalogPage = (params) => {
-  const pageContent = document.getElementById('page-content');
-  pageContent.innerHTML = '<h1>Courses Catalog</h1><p>Browse available courses here.</p>';
-};
-
-const courseDetailPage = (params) => {
-  const pageContent = document.getElementById('page-content');
-  pageContent.innerHTML = `<h1>Course Detail</h1><p>Course ID: ${params.id}</p>`;
-};
-
-const notFoundPage = (params) => {
-  const pageContent = document.getElementById('page-content');
-  pageContent.innerHTML = '<h1>404 - Page Not Found</h1>';
-};
+const dashboardPage = () => setPageContent(renderDashboardPage());
+const catalogPage = () => setPageContent(renderCatalogPage());
+const courseDetailPage = params => setPageContent(renderCourseDetailPage(params));
+const notFoundPage = () => setPageContent(renderNotFoundPage());
 
 const routes = [
   { path: '/', handler: dashboardPage },
@@ -34,10 +28,9 @@ const routes = [
   { path: '/not-found', handler: notFoundPage }
 ];
 
-let router;
-
 function renderModal() {
   const modalRoot = document.getElementById('modal-root');
+  if (!modalRoot) return;
   modalRoot.innerHTML = '';
 
   const activeModal = uiStore.getState().modal;
@@ -54,6 +47,7 @@ function renderModal() {
 
 function handleDocumentClick(event) {
   const target = event.target;
+  if (!(target instanceof Element)) return;
 
   if (target.closest('.btn-login')) {
     uiStore.openModal('login');
@@ -69,15 +63,18 @@ function handleDocumentClick(event) {
     logout().then(() => {
       authStore.clearAuth();
     }).catch(() => {
-      authStore.clearAuth(); // Clear anyway
+      authStore.clearAuth();
     });
-    return;
   }
 }
 
 function initApp() {
   const appElement = appShell.render();
-  document.getElementById('app').appendChild(appElement);
+  const appRoot = document.getElementById('app');
+  if (!appRoot) {
+    throw new Error('Missing #app root element');
+  }
+  appRoot.appendChild(appElement);
 
   document.addEventListener('click', handleDocumentClick);
   document.addEventListener('keydown', (event) => {
@@ -86,7 +83,7 @@ function initApp() {
     }
   });
 
-  router = new Router(routes);
+  new Router(routes);
 
   authStore.subscribe(() => {
     appShell.updateNavbar();
@@ -99,4 +96,4 @@ function initApp() {
   renderModal();
 }
 
-export { initApp, router };
+export { initApp };

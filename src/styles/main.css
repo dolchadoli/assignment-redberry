@@ -1,6 +1,3 @@
-@import 'reset.css';
-@import 'variables.css';
-@import 'utilities.css';
 @import 'layout.css';
 @import 'components/buttons.css';
 @import 'components/modal.css';
