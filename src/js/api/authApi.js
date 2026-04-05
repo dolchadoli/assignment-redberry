@@ -20,4 +20,4 @@ function logout() {
   });
 }
 
-export { login, register };
+export { login, register, logout };

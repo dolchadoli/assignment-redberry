@@ -23,7 +23,7 @@ function createLoginModal() {
         <div class="form-error" aria-live="polite"></div>
         <button class="btn btn-primary" type="submit">Log In</button>
       </form>
-      <p class="modal-switch">Don’t have an account? <button class="modal-link" type="button">Sign Up</button></p>
+      <p class="modal-switch">Don't have an account? <button class="modal-link" type="button">Sign Up</button></p>
     </div>
   `;
 
@@ -74,3 +74,4 @@ function createLoginModal() {
 }
 
 export default { createModal: createLoginModal };
+
