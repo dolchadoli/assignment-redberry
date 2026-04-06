@@ -15,6 +15,7 @@ class Navbar {
             ${isAuthenticated ? `
               <button class="btn-enrolled">Enrolled Courses</button>
               <button class="btn-profile">Profile</button>
+              <button class="btn-logout">Logout</button>
             ` : `
               <button class="btn-login">Log In</button>
               <button class="btn-signup">Sign Up</button>

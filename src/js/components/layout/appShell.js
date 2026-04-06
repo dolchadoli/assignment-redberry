@@ -14,13 +14,13 @@ class AppShell {
         ${navbar.render()}
         <main id="page-content" class="page-container"></main>
         ${footer.render()}
+        <div id="modal-root"></div>
       `;
     }
     return this.element;
   }
 
   updateNavbar() {
-    // Will be called to re-render navbar when auth state changes
     const navbarElement = this.element.querySelector('.navbar');
     if (navbarElement) {
       navbarElement.outerHTML = navbar.render();
