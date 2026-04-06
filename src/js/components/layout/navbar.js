@@ -1,5 +1,27 @@
+import { authStore } from '../../state/authStore.js';
+
 class Navbar {
   render() {
+    if (!authStore.isAuthenticated()) {
+      return `
+        <nav class="navbar">
+          <div class="navbar-container">
+            <a href="#/" class="navbar-logo" aria-label="Go to dashboard">
+              <img src="/assets/images/Logo.png" alt="Online Courses Logo" />
+            </a>
+            <div class="navbar-links">
+              <a href="#/courses" class="nav-link">
+                <img src="/assets/icons/stars.png" alt="Browse Courses" />
+                <span>Browse Courses</span>
+              </a>
+              <button type="button" class="nav-link btn-login">Log In</button>
+              <button type="button" class="nav-link btn-signup">Sign Up</button>
+            </div>
+          </div>
+        </nav>
+      `;
+    }
+
     return `
       <nav class="navbar">
         <div class="navbar-container">

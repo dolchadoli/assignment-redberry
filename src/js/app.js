@@ -5,7 +5,7 @@ import { uiStore } from './state/uiStore.js';
 import { logout } from './services/authService.js';
 import loginModal from './components/modals/loginModal.js';
 import registerModal from './components/modals/registerModal.js';
-import { renderDashboardPage } from './pages/dashboardPage.js';
+import { renderDashboardPage, initDashboardPage } from './pages/dashboardPage.js';
 import { renderCatalogPage } from './pages/catalogPage.js';
 import { renderCourseDetailPage } from './pages/courseDetailPage.js';
 import { renderNotFoundPage } from './pages/notFoundPage.js';
@@ -16,7 +16,10 @@ function setPageContent(markup) {
   pageContent.innerHTML = markup;
 }
 
-const dashboardPage = () => setPageContent(renderDashboardPage());
+const dashboardPage = () => {
+  setPageContent(renderDashboardPage());
+  initDashboardPage();
+};
 const catalogPage = () => setPageContent(renderCatalogPage());
 const courseDetailPage = params => setPageContent(renderCourseDetailPage(params));
 const notFoundPage = () => setPageContent(renderNotFoundPage());

@@ -22,11 +22,31 @@
   overflow: hidden;
 }
 
+.modal-card--register {
+  width: 460px;
+  max-width: min(460px, calc(100vw - 48px));
+  padding: 14px 24px 18px;
+}
+
+.modal-card--register[data-step='1'] {
+  height: 416px;
+  padding: 10px 24px 16px;
+}
+
+.modal-card--register[data-step='2'] {
+  height: 513px;
+}
+
+.modal-card--register[data-step='3'] {
+  height: 622px;
+}
+
 .modal-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   margin-bottom: 20px;
+  position: relative;
 }
 
 .modal-header h2 {
@@ -35,18 +55,57 @@
   color: #101828;
 }
 
-.modal-close {
+.modal-back {
+  position: absolute;
+  left: 0;
   border: none;
   background: transparent;
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
+  color: #98a2b3;
+}
+
+.modal-close {
+  position: absolute;
+  right: 0;
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: #98a2b3;
 }
 
 .modal-body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.modal-subtitle {
+  margin: -6px 0 0;
+  text-align: center;
+  color: #667085;
+  font-size: 14px;
+}
+
+.register-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.register-step {
+  height: 8px;
+  border-radius: 999px;
+  background: #e6e4f6;
+}
+
+.register-step.is-active,
+.register-step.is-complete {
+  background: #5d57f4;
 }
 
 .form-group {
@@ -100,6 +159,8 @@
 .modal-switch {
   font-size: 14px;
   color: #475467;
+  margin: 0;
+  text-align: center;
 }
 
 .modal-link {
@@ -114,4 +175,53 @@
 
 .btn-primary {
   width: 100%;
+}
+
+.modal-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #98a2b3;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.modal-divider::before,
+.modal-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid #d0d5dd;
+}
+
+.modal-card--register[data-step='1'] .modal-header {
+  margin-bottom: 6px;
+}
+
+.modal-card--register[data-step='1'] .modal-body {
+  gap: 6px;
+}
+
+.modal-card--register[data-step='1'] .form-group {
+  gap: 4px;
+}
+
+.modal-card--register[data-step='1'] .btn-primary {
+  margin-top: 0;
+}
+
+.modal-card--register[data-step='1'] .modal-subtitle {
+  margin-top: 0;
+}
+
+.modal-card--register[data-step='1'] .register-steps {
+  margin-top: 2px;
+}
+
+.modal-card--register[data-step='1'] .modal-divider {
+  margin-top: 0;
+}
+
+.modal-card--register[data-step='1'] .modal-switch {
+  margin-top: -2px;
 }
