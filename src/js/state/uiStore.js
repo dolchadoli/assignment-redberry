@@ -20,6 +20,9 @@ class UIStore {
 
   subscribe(listener) {
     this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(item => item !== listener);
+    };
   }
 
   notify() {
