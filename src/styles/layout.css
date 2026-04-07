@@ -1,4 +1,4 @@
-/* App Shell */
+﻿/* App Shell */
 body {
   font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background-color: #f8f8fb;
@@ -165,15 +165,129 @@ body {
 
 /* Footer */
 .footer {
-  background-color: #f9fafb;
-  border-top: 1px solid #e5e7eb;
-  padding: 32px;
-  text-align: center;
+  margin-top: 56px;
+  background-color: #f8f8fb;
+  border-top: 1px solid #e3e4ea;
+  padding: 54px 0 24px;
 }
 
 .footer-container {
-  max-width: 1920px;
+  width: min(1566px, 100%);
   margin: 0 auto;
+  padding: 0 16px;
+}
+
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+}
+
+.footer-brand {
+  max-width: 320px;
+}
+
+.footer-brand-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.footer-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.footer-brand-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2f2f93;
+}
+
+.footer-brand-text {
+  margin: 12px 0 0;
+  color: #3a3d4d;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.footer-socials {
+  margin-top: 18px;
+  display: flex;
+  gap: 14px;
+}
+
+.footer-social-link {
+  text-decoration: none;
+  color: #4f46e5;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.footer-social-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  display: block;
+}
+
+.footer-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 72px;
+}
+
+.footer-col-title {
+  margin: 0;
+  color: #23257a;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.footer-col-link,
+.footer-contact-line {
+  margin: 12px 0 0;
+  display: block;
+  color: #66697a;
+  text-decoration: none;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.footer-contact-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-contact-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.footer-bottom {
+  margin-top: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.footer-copy,
+.footer-legal {
+  margin: 0;
+  color: #777a89;
+  font-size: 14px;
+}
+
+.footer-legal-link {
+  color: #4f46e5;
+  text-decoration: none;
 }
 
 /* Dashboard */
@@ -313,7 +427,7 @@ body {
 
 .dashboard-start-learning-subtitle {
   margin: 10px 0 0;
-  font-size: 28px;
+  font-size: 22px;
   color: #494a53;
 }
 
@@ -508,7 +622,7 @@ body {
   }
 
   .dashboard-start-learning-title {
-    font-size: 34px;
+    font-size: 16px;
   }
 
   .dashboard-start-learning-subtitle {
@@ -538,6 +652,11 @@ body {
     font-size: 20px;
   }
 }
+
+
+
+
+
 
 
 
