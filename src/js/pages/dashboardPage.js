@@ -1,3 +1,5 @@
+import { fetchCourses, fetchFeaturedCourses } from '../api/coursesApi.js';
+
 const HERO_SLIDES = [
   '/assets/images/slider1.svg',
   '/assets/images/slider2.svg',
@@ -10,6 +12,136 @@ const ARROWS = {
   rightBright: '/assets/icons/arrow_right_bright.svg',
   rightDim: '/assets/icons/arrow_right_dim.svg',
 };
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function extractCourses(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  if (Array.isArray(payload?.courses)) {
+    return payload.courses;
+  }
+
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  return [];
+}
+
+function getCourseImage(course) {
+  return (
+    course?.cover_image
+    || course?.image
+    || course?.thumbnail
+    || '/assets/images/slider1.svg'
+  );
+}
+
+function getCourseTitle(course) {
+  return course?.title || course?.name || 'Untitled course';
+}
+
+function getCourseDescription(course) {
+  return (
+    course?.description
+    || course?.short_description
+    || 'Learn practical skills with expert-led lessons.'
+  );
+}
+
+function getCourseInstructor(course) {
+  return (
+    course?.lecturer
+    || course?.lecturer_name
+    || course?.instructor_name
+    || course?.instructor?.name
+    || 'Lecturer Marilyn Mango'
+  );
+}
+
+function getCoursePrice(course) {
+  const rawPrice = Number(course?.price);
+  return Number.isFinite(rawPrice) ? rawPrice : 299;
+}
+
+function getCourseRating(course) {
+  const rawRating = Number(course?.rating);
+  return Number.isFinite(rawRating) ? rawRating.toFixed(1) : '4.9';
+}
+
+function renderCourseCards(courses) {
+  return courses.map(course => {
+    const id = course?.id ?? '';
+    const image = escapeHtml(getCourseImage(course));
+    const title = escapeHtml(getCourseTitle(course));
+    const description = escapeHtml(getCourseDescription(course));
+    const instructor = escapeHtml(getCourseInstructor(course));
+    const rating = escapeHtml(getCourseRating(course));
+    const price = escapeHtml(getCoursePrice(course));
+    const detailsLink = id ? `#/courses/${id}` : '#/courses';
+
+    return `
+      <article class="dashboard-course-card">
+        <img class="dashboard-course-image" src="${image}" alt="${title}" />
+        <div class="dashboard-course-meta">
+          <span class="dashboard-course-instructor">${instructor}</span>
+          <span class="dashboard-course-rating"><span class="dashboard-course-rating-star">&#9733;</span> ${rating}</span>
+        </div>
+        <h3 class="dashboard-course-title">${title}</h3>
+        <p class="dashboard-course-description">${description}</p>
+        <div class="dashboard-course-footer">
+          <div class="dashboard-course-price-wrap">
+            <span class="dashboard-course-price-label">Starting from</span>
+            <strong class="dashboard-course-price">$${price}</strong>
+          </div>
+          <a class="dashboard-course-details" href="${detailsLink}">Details</a>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadStartLearningCourses() {
+  const cardsRoot = document.querySelector('[data-start-learning-cards]');
+  if (!(cardsRoot instanceof HTMLElement)) {
+    return;
+  }
+
+  cardsRoot.innerHTML = '<p class="dashboard-courses-message">Loading courses...</p>';
+
+  try {
+    const featuredPayload = await fetchFeaturedCourses();
+    let courses = extractCourses(featuredPayload).slice(0, 3);
+
+    if (courses.length === 0) {
+      const fallbackPayload = await fetchCourses({ sort: 'newest', page: 1 });
+      courses = extractCourses(fallbackPayload).slice(0, 3);
+    }
+
+    if (courses.length === 0) {
+      cardsRoot.innerHTML = '<p class="dashboard-courses-message">No courses available right now.</p>';
+      return;
+    }
+
+    cardsRoot.innerHTML = renderCourseCards(courses);
+  } catch (_error) {
+    cardsRoot.innerHTML = '<p class="dashboard-courses-message">Unable to load courses right now.</p>';
+  }
+}
 
 function renderDashboardPage() {
   const slidesMarkup = HERO_SLIDES.map((src, index) => {
@@ -52,6 +184,12 @@ function renderDashboardPage() {
           </button>
         </div>
       </div>
+
+      <section class="dashboard-start-learning">
+        <h2 class="dashboard-start-learning-title">Start Learning Today</h2>
+        <p class="dashboard-start-learning-subtitle">Choose from our most popular courses and begin your journey</p>
+        <div class="dashboard-courses-grid" data-start-learning-cards></div>
+      </section>
     </section>
   `;
 }
@@ -128,6 +266,7 @@ function initDashboardPage() {
   });
 
   setActiveSlide(0);
+  loadStartLearningCourses();
 }
 
 export { renderDashboardPage, initDashboardPage };

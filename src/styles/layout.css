@@ -1,12 +1,14 @@
 /* App Shell */
 body {
   font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f8f8fb;
 }
 
 .app-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: #f8f8fb;
 }
 
 .page-container {
@@ -14,6 +16,7 @@ body {
   padding: 28px 20px 20px;
   max-width: 1920px;
   margin: 0 auto;
+  background-color: #f8f8fb;
 }
 
 /* Navbar */
@@ -177,6 +180,7 @@ body {
 .dashboard-page {
   width: min(1566px, 100%);
   margin: 0 auto;
+  background-color: #f8f8fb;
 }
 
 .dashboard-hero {
@@ -294,6 +298,135 @@ body {
   display: none;
 }
 
+.dashboard-start-learning {
+  margin-top: 52px;
+  background: transparent;
+}
+
+.dashboard-start-learning-title {
+  margin: 0;
+  font-size: 50px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #17171b;
+}
+
+.dashboard-start-learning-subtitle {
+  margin: 10px 0 0;
+  font-size: 28px;
+  color: #494a53;
+}
+
+.dashboard-courses-grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 26px;
+  align-items: stretch;
+}
+
+.dashboard-course-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 576px;
+}
+
+.dashboard-course-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+
+.dashboard-course-meta {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dashboard-course-instructor {
+  font-size: 14px;
+  color: #83838f;
+}
+
+.dashboard-course-rating {
+  font-size: 14px;
+  color: #5b5c66;
+}
+
+.dashboard-course-rating-star {
+  color: #f6b000;
+}
+
+.dashboard-course-title {
+  margin: 10px 0 0;
+  font-size: 18px;
+  line-height: 1.22;
+  font-weight: 600;
+  color: #18191f;
+}
+
+.dashboard-course-description {
+  margin: 14px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #5e606c;
+}
+
+.dashboard-course-footer {
+  margin-top: auto;
+  padding-top: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dashboard-course-price-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-course-price-label {
+  font-size: 12px;
+  color: #9797a3;
+}
+
+.dashboard-course-price {
+  margin-top: 0;
+  font-size: 42px;
+  line-height: 1;
+  color: #111218;
+}
+
+.dashboard-course-details {
+  min-width: 96px;
+  height: 48px;
+  border-radius: 10px;
+  background: #4f46e5;
+  color: #ffffff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.dashboard-courses-message {
+  margin: 0;
+  padding: 24px 10px;
+  font-size: 24px;
+  color: #656673;
+}
+
 @media (max-width: 900px) {
   .dashboard-hero-cta {
     width: 150px;
@@ -319,5 +452,40 @@ body {
   .dashboard-hero-arrow {
     width: 36px;
     height: 36px;
+  }
+
+  .dashboard-start-learning {
+    margin-top: 30px;
+  }
+
+  .dashboard-start-learning-title {
+    font-size: 34px;
+  }
+
+  .dashboard-start-learning-subtitle {
+    font-size: 18px;
+  }
+
+  .dashboard-courses-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .dashboard-course-title {
+    font-size: 18px;
+  }
+
+  .dashboard-course-description {
+    font-size: 15px;
+  }
+
+  .dashboard-course-price {
+    font-size: 36px;
+  }
+
+  .dashboard-course-details {
+    min-width: 84px;
+    height: 40px;
+    font-size: 20px;
   }
 }
