@@ -427,7 +427,56 @@ body {
   color: #656673;
 }
 
+
+.dashboard-continue-learning-locked {
+  margin-top: 52px;
+}
+
+.dashboard-continue-learning-locked-media {
+  position: relative;
+}
+
+.dashboard-continue-learning-locked-image {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+}
+
+.dashboard-continue-learning-login-hitbox {
+  position: absolute;
+  left: 48.2%;
+  top: 71.9%;
+  transform: translateX(-50%);
+  width: 83px;
+  height: 42px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.dashboard-continue-learning-see-all-hitbox {
+  position: absolute;
+  right: 1.2%;
+  top: 13.4%;
+  width: 62px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
 @media (max-width: 900px) {
+  .dashboard-continue-learning-login-hitbox {
+    width: 84px;
+    height: 36px;
+    top: 79.5%;
+  }
+  .dashboard-continue-learning-see-all-hitbox {
+    right: 2.2%;
+    top: 8.4%;
+    width: 64px;
+    height: 30px;
+  }
+
   .dashboard-hero-cta {
     width: 150px;
     height: 48px;
@@ -483,9 +532,34 @@ body {
     font-size: 36px;
   }
 
-  .dashboard-course-details {
+    .dashboard-course-details {
     min-width: 84px;
     height: 40px;
     font-size: 20px;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

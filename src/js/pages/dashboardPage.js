@@ -190,6 +190,13 @@ function renderDashboardPage() {
         <p class="dashboard-start-learning-subtitle">Choose from our most popular courses and begin your journey</p>
         <div class="dashboard-courses-grid" data-start-learning-cards></div>
       </section>
+      <section class="dashboard-continue-learning-locked">
+        <div class="dashboard-continue-learning-locked-media">
+          <img class="dashboard-continue-learning-locked-image" src="/assets/images/locked-state.svg" alt="Continue learning locked state" />
+          <button type="button" class="dashboard-continue-learning-login-hitbox btn-login" aria-label="Log In"></button>
+          <button type="button" class="dashboard-continue-learning-see-all-hitbox btn-login" aria-label="See all courses"></button>
+        </div>
+      </section>
     </section>
   `;
 }
@@ -270,3 +277,8 @@ function initDashboardPage() {
 }
 
 export { renderDashboardPage, initDashboardPage };
+
+
+
+
+
