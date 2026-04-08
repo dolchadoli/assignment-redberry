@@ -37,9 +37,14 @@ class Navbar {
               <img src="/assets/icons/book.png" alt="Enrolled Courses" />
               <span>Enrolled Courses</span>
             </button>
-            <button type="button" class="btn-profile" aria-label="Open account menu">
-              <img src="/assets/images/Avatar.png" alt="Profile" />
-            </button>
+            <div class="profile-menu" data-profile-menu>
+              <button type="button" class="btn-profile" data-profile-toggle aria-label="Open account menu" aria-haspopup="true">
+                <img src="/assets/images/Avatar.png" alt="Profile" />
+              </button>
+              <div class="profile-dropdown" data-profile-dropdown>
+                <button type="button" class="profile-dropdown-item btn-logout">Log Out</button>
+              </div>
+            </div>
           </div>
         </div>
       </nav>

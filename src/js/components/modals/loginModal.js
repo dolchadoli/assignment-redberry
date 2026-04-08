@@ -4,6 +4,22 @@ import { login } from '../../services/authService.js';
 import { isValidEmail, isRequired, hasMinLength } from '../../utils/validators.js';
 import { createOverlayModal } from './modalBase.js';
 
+function extractToken(payload) {
+  return (
+    payload?.token
+    || payload?.accessToken
+    || payload?.access_token
+    || payload?.data?.token
+    || payload?.data?.accessToken
+    || payload?.data?.access_token
+    || null
+  );
+}
+
+function extractUser(payload) {
+  return payload?.user || payload?.data?.user || payload || null;
+}
+
 function createLoginModal() {
   const html = `
     <div class="modal-header">
@@ -55,8 +71,8 @@ function createLoginModal() {
 
     try {
       const response = await login(email, password);
-      const token = response.token || response.accessToken || null;
-      const user = response.user || response;
+      const token = extractToken(response);
+      const user = extractUser(response);
 
       if (!token) {
         throw new Error('Unable to log in. Please try again.');

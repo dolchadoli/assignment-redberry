@@ -1,4 +1,5 @@
 import { fetchCourses, fetchFeaturedCourses } from '../api/coursesApi.js';
+import { authStore } from '../state/authStore.js';
 
 const HERO_SLIDES = [
   '/assets/images/slider1.svg',
@@ -144,6 +145,18 @@ async function loadStartLearningCourses() {
 }
 
 function renderDashboardPage() {
+  const continueLearningLockedMarkup = authStore.isAuthenticated()
+    ? ''
+    : `
+      <section class="dashboard-continue-learning-locked">
+        <div class="dashboard-continue-learning-locked-media">
+          <img class="dashboard-continue-learning-locked-image" src="/assets/images/locked-state.svg" alt="Continue learning locked state" />
+          <button type="button" class="dashboard-continue-learning-login-hitbox btn-login" aria-label="Log In"></button>
+          <button type="button" class="dashboard-continue-learning-see-all-hitbox btn-login" aria-label="See all courses"></button>
+        </div>
+      </section>
+    `;
+
   const slidesMarkup = HERO_SLIDES.map((src, index) => {
     const alt = index === 0 ? 'Featured course slider item 1' : 'Featured course slider item 2';
     return `
@@ -190,13 +203,7 @@ function renderDashboardPage() {
         <p class="dashboard-start-learning-subtitle">Choose from our most popular courses and begin your journey</p>
         <div class="dashboard-courses-grid" data-start-learning-cards></div>
       </section>
-      <section class="dashboard-continue-learning-locked">
-        <div class="dashboard-continue-learning-locked-media">
-          <img class="dashboard-continue-learning-locked-image" src="/assets/images/locked-state.svg" alt="Continue learning locked state" />
-          <button type="button" class="dashboard-continue-learning-login-hitbox btn-login" aria-label="Log In"></button>
-          <button type="button" class="dashboard-continue-learning-see-all-hitbox btn-login" aria-label="See all courses"></button>
-        </div>
-      </section>
+      ${continueLearningLockedMarkup}
     </section>
   `;
 }

@@ -52,6 +52,27 @@ function handleDocumentClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
 
+  const profileToggle = target.closest('[data-profile-toggle]');
+  if (profileToggle) {
+    const clickedMenu = profileToggle.closest('[data-profile-menu]');
+    document.querySelectorAll('[data-profile-menu].is-open').forEach((menu) => {
+      if (menu !== clickedMenu) {
+        menu.classList.remove('is-open');
+      }
+    });
+
+    if (clickedMenu) {
+      clickedMenu.classList.toggle('is-open');
+    }
+    return;
+  }
+
+  if (!target.closest('[data-profile-menu]')) {
+    document.querySelectorAll('[data-profile-menu].is-open').forEach((menu) => {
+      menu.classList.remove('is-open');
+    });
+  }
+
   if (target.closest('.btn-login')) {
     uiStore.openModal('login');
     return;
@@ -90,6 +111,10 @@ function initApp() {
 
   authStore.subscribe(() => {
     appShell.updateNavbar();
+    const currentHash = window.location.hash || '#/';
+    if (currentHash === '#/' || currentHash === '' || currentHash === '#') {
+      dashboardPage();
+    }
   });
 
   uiStore.subscribe(() => {
