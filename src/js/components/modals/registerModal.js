@@ -1,6 +1,6 @@
 import { uiStore } from '../../state/uiStore.js';
 import { authStore } from '../../state/authStore.js';
-import { register } from '../../services/authService.js';
+import { register, login } from '../../services/authService.js';
 import { isValidEmail, isRequired, hasMinLength } from '../../utils/validators.js';
 import { createOverlayModal } from './modalBase.js';
 
@@ -24,7 +24,23 @@ function getErrorMessage(error) {
     }
   }
 
-  return 'Registration failed. Please check your input.';
+  return 'Registration failed. Please try again.';
+}
+
+function extractToken(payload) {
+  return (
+    payload?.token ??
+    payload?.accessToken ??
+    payload?.access_token ??
+    payload?.data?.token ??
+    payload?.data?.accessToken ??
+    payload?.data?.access_token ??
+    null
+  );
+}
+
+function extractUser(payload) {
+  return payload?.user ?? payload?.data?.user ?? payload ?? null;
 }
 
 function createRegisterModal() {
@@ -52,11 +68,17 @@ function createRegisterModal() {
         <div class="register-step-pane" data-step-pane="2" hidden>
           <div class="form-group">
             <label for="register-password">Password*</label>
-            <input id="register-password" name="password" type="password" placeholder="Password" />
+            <div class="input-with-toggle">
+              <input id="register-password" name="password" type="password" placeholder="Password" />
+              <button class="password-toggle" type="button" data-password-toggle="register-password" aria-label="Show password"></button>
+            </div>
           </div>
           <div class="form-group">
             <label for="register-confirm-password">Confirm Password*</label>
-            <input id="register-confirm-password" name="confirmPassword" type="password" placeholder="Confirm password" />
+            <div class="input-with-toggle">
+              <input id="register-confirm-password" name="confirmPassword" type="password" placeholder="Confirm password" />
+              <button class="password-toggle" type="button" data-password-toggle="register-confirm-password" aria-label="Show password"></button>
+            </div>
           </div>
         </div>
 
@@ -67,7 +89,12 @@ function createRegisterModal() {
           </div>
           <div class="form-group">
             <label for="register-avatar">Upload Avatar</label>
-            <input id="register-avatar" name="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
+            <div class="avatar-dropzone" data-avatar-dropzone>
+              <input id="register-avatar" class="avatar-input-hidden" name="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
+              <span class="avatar-dropzone-icon" aria-hidden="true"></span>
+              <p class="avatar-dropzone-text">Drag and drop or <button type="button" class="avatar-browse-btn" data-avatar-browse>Upload file</button></p>
+              <p class="avatar-dropzone-hint">JPG, PNG or WebP</p>
+            </div>
             <div class="avatar-preview" data-avatar-preview></div>
           </div>
         </div>
@@ -89,12 +116,31 @@ function createRegisterModal() {
   const submitButton = overlay.querySelector('[data-register-submit]');
   const stepPanes = overlay.querySelectorAll('[data-step-pane]');
   const stepIndicators = overlay.querySelectorAll('.register-step');
+  const passwordToggleButtons = overlay.querySelectorAll('[data-password-toggle]');
   const avatarInput = overlay.querySelector('#register-avatar');
+  const avatarDropzone = overlay.querySelector('[data-avatar-dropzone]');
+  const avatarBrowseButton = overlay.querySelector('[data-avatar-browse]');
   const avatarPreview = overlay.querySelector('[data-avatar-preview]');
   let currentStep = 1;
 
   switchButton.addEventListener('click', () => {
     uiStore.openModal('login');
+  });
+
+  passwordToggleButtons.forEach((toggleButton) => {
+    const targetInputId = toggleButton.getAttribute('data-password-toggle');
+    const targetInput = overlay.querySelector(`#${targetInputId}`);
+
+    if (!targetInput) {
+      return;
+    }
+
+    toggleButton.addEventListener('click', () => {
+      const isVisible = targetInput.type === 'text';
+      targetInput.type = isVisible ? 'password' : 'text';
+      toggleButton.classList.toggle('is-visible', !isVisible);
+      toggleButton.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
+    });
   });
 
   function renderStep() {
@@ -109,8 +155,10 @@ function createRegisterModal() {
 
     stepIndicators.forEach((indicator, index) => {
       const stepNumber = index + 1;
-      indicator.classList.toggle('is-active', stepNumber === currentStep);
-      indicator.classList.toggle('is-complete', stepNumber < currentStep);
+      const isComplete = stepNumber < currentStep;
+      const isActive = currentStep < 3 && stepNumber === currentStep;
+      indicator.classList.toggle('is-active', isActive);
+      indicator.classList.toggle('is-complete', isComplete);
     });
 
     backButton.hidden = currentStep === 1;
@@ -125,26 +173,72 @@ function createRegisterModal() {
     }
   });
 
-  avatarInput.addEventListener('change', () => {
-    errorBox.textContent = '';
+  function showAvatarPreview(file) {
     avatarPreview.innerHTML = '';
+    const previewImage = document.createElement('img');
+    previewImage.className = 'avatar-image';
+    previewImage.alt = 'Avatar preview';
+    previewImage.src = URL.createObjectURL(file);
+    avatarPreview.appendChild(previewImage);
+  }
 
-    const file = avatarInput.files?.[0];
+  function setAvatarInputFile(file) {
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      avatarInput.files = transfer.files;
+    } catch {
+      // Ignore assignment failures in older browsers.
+    }
+  }
+
+  function handleAvatarFile(file) {
+    errorBox.textContent = '';
+    avatarDropzone.classList.remove('is-dragover');
+
     if (!file) {
+      avatarPreview.innerHTML = '';
       return;
     }
 
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
       errorBox.textContent = 'Avatar must be jpg, png, or webp.';
       avatarInput.value = '';
+      avatarPreview.innerHTML = '';
       return;
     }
 
-    const previewImage = document.createElement('img');
-    previewImage.className = 'avatar-image';
-    previewImage.alt = 'Avatar preview';
-    previewImage.src = URL.createObjectURL(file);
-    avatarPreview.appendChild(previewImage);
+    showAvatarPreview(file);
+  }
+
+  avatarBrowseButton.addEventListener('click', () => {
+    avatarInput.click();
+  });
+
+  avatarInput.addEventListener('change', () => {
+    const file = avatarInput.files?.[0];
+    handleAvatarFile(file);
+  });
+
+  avatarDropzone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    avatarDropzone.classList.add('is-dragover');
+  });
+
+  avatarDropzone.addEventListener('dragleave', () => {
+    avatarDropzone.classList.remove('is-dragover');
+  });
+
+  avatarDropzone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) {
+      avatarDropzone.classList.remove('is-dragover');
+      return;
+    }
+
+    setAvatarInputFile(file);
+    handleAvatarFile(file);
   });
 
   form.addEventListener('submit', async (event) => {
@@ -218,6 +312,7 @@ function createRegisterModal() {
     formData.append('username', username);
     formData.append('email', email);
     formData.append('password', password);
+    formData.append('password_confirmation', confirmPassword);
 
     if (avatarFile) {
       formData.append('avatar', avatarFile);
@@ -225,11 +320,21 @@ function createRegisterModal() {
 
     try {
       const response = await register(formData);
-      const token = response?.token ?? response?.accessToken ?? null;
-      const user = response?.user ?? response ?? null;
+      const token = extractToken(response);
+      const user = extractUser(response);
 
       if (!token) {
-        throw new Error('Registration failed. Please try again.');
+        const loginResponse = await login(email, password);
+        const loginToken = extractToken(loginResponse);
+        const loginUser = extractUser(loginResponse);
+
+        if (!loginToken) {
+          throw new Error('Registration succeeded but login token was not returned.');
+        }
+
+        authStore.setAuth(loginToken, loginUser);
+        uiStore.closeModal();
+        return;
       }
 
       authStore.setAuth(token, user);
