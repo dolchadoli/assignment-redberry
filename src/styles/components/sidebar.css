@@ -1,0 +1,114 @@
+.enrolled-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.28);
+  z-index: 998;
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 280ms ease, visibility 280ms ease;
+}
+
+.enrolled-sidebar-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.enrolled-sidebar {
+  width: min(794px, 100vw);
+  height: 100vh;
+  background: #f8f8fb;
+  box-shadow: -10px 0 28px rgba(17, 24, 39, 0.14);
+  display: flex;
+  flex-direction: column;
+  padding: 36px 42px 34px;
+  transform: translateX(100%);
+  transition: transform 280ms ease;
+}
+
+.enrolled-sidebar-overlay.is-open .enrolled-sidebar {
+  transform: translateX(0);
+}
+
+.enrolled-sidebar-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.enrolled-sidebar-title {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.1;
+  color: #12131a;
+}
+
+.enrolled-sidebar-count {
+  margin: 0;
+  font-size: 14px;
+  color: #4b4c56;
+}
+
+.enrolled-sidebar-close {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 34px;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.enrolled-sidebar-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.enrolled-sidebar-empty {
+  text-align: center;
+}
+
+.enrolled-sidebar-empty-icon {
+  display: block;
+  margin: 0 auto 14px;
+}
+
+.enrolled-sidebar-empty-title {
+  margin: 0;
+  font-size: 28px;
+  color: #23257a;
+}
+
+.enrolled-sidebar-empty-subtitle {
+  margin: 10px 0 0;
+  color: #5d6170;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.enrolled-sidebar-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  width: 146px;
+  height: 44px;
+  border-radius: 10px;
+  background: #4f46e5;
+  color: #fff;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.enrolled-sidebar-empty-cta:hover {
+  background: #453dd3;
+}

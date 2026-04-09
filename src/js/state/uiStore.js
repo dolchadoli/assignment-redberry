@@ -1,11 +1,12 @@
 class UIStore {
   constructor() {
     this.modal = null;
+    this.sidebar = null;
     this.listeners = [];
   }
 
   getState() {
-    return { modal: this.modal };
+    return { modal: this.modal, sidebar: this.sidebar };
   }
 
   openModal(modalName) {
@@ -15,6 +16,16 @@ class UIStore {
 
   closeModal() {
     this.modal = null;
+    this.notify();
+  }
+
+  openSidebar(sidebarName) {
+    this.sidebar = sidebarName;
+    this.notify();
+  }
+
+  closeSidebar() {
+    this.sidebar = null;
     this.notify();
   }
 

@@ -15,6 +15,8 @@ class AppShell {
         <main id="page-content" class="page-container"></main>
         ${footer.render()}
         <div id="modal-root"></div>
+        <div id="sidebar-root"></div>
+        <div id="toast-root"></div>
       `;
     }
     return this.element;
