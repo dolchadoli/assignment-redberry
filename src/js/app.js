@@ -7,7 +7,7 @@ import loginModal from './components/modals/loginModal.js';
 import registerModal from './components/modals/registerModal.js';
 import { renderEnrolledCoursesSidebarOverlay } from './components/sidebar/enrolledCoursesSidebar.js';
 import { renderDashboardPage, initDashboardPage } from './pages/dashboardPage.js';
-import { renderCatalogPage } from './pages/catalogPage.js';
+import { renderCatalogPage, initCatalogPage } from './pages/catalogPage.js';
 import { renderCourseDetailPage } from './pages/courseDetailPage.js';
 import { renderNotFoundPage } from './pages/notFoundPage.js';
 
@@ -24,7 +24,10 @@ const dashboardPage = () => {
   setPageContent(renderDashboardPage());
   initDashboardPage();
 };
-const catalogPage = () => setPageContent(renderCatalogPage());
+const catalogPage = () => {
+  setPageContent(renderCatalogPage());
+  initCatalogPage();
+};
 const courseDetailPage = params => setPageContent(renderCourseDetailPage(params));
 const notFoundPage = () => setPageContent(renderNotFoundPage());
 
