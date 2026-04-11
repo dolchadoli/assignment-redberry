@@ -8,7 +8,7 @@ import registerModal from './components/modals/registerModal.js';
 import { renderEnrolledCoursesSidebarOverlay } from './components/sidebar/enrolledCoursesSidebar.js';
 import { renderDashboardPage, initDashboardPage } from './pages/dashboardPage.js';
 import { renderCatalogPage, initCatalogPage } from './pages/catalogPage.js';
-import { renderCourseDetailPage } from './pages/courseDetailPage.js';
+import { renderCourseDetailPage, initCourseDetailPage } from './pages/courseDetailPage.js';
 import { renderNotFoundPage } from './pages/notFoundPage.js';
 
 const SIDEBAR_TRANSITION_MS = 280;
@@ -28,7 +28,10 @@ const catalogPage = () => {
   setPageContent(renderCatalogPage());
   initCatalogPage();
 };
-const courseDetailPage = params => setPageContent(renderCourseDetailPage(params));
+const courseDetailPage = (params) => {
+  setPageContent(renderCourseDetailPage(params));
+  initCourseDetailPage(params);
+};
 const notFoundPage = () => setPageContent(renderNotFoundPage());
 
 const routes = [
