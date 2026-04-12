@@ -122,6 +122,14 @@
   justify-content: center;
 }
 
+.catalog-instructor-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
 .catalog-instructor-item.is-active .catalog-instructor-avatar {
   background: #d8d5ff;
   color: #2f2f93;

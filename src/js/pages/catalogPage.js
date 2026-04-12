@@ -14,7 +14,6 @@ const catalogState = {
 
 const CATEGORIES = ['Development', 'Design', 'Business', 'Data Science', 'Marketing'];
 const TOPICS = ['React', 'TypeScript', 'Python', 'UX/UI', 'Figma', 'JavaScript', 'Node.js', 'Machine Learning', 'SEO', 'Analytics'];
-const INSTRUCTORS = ['Marilyn Mango', 'Ryan Dorwart', 'Roger Calzoni', 'Zain Philips'];
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -78,6 +77,10 @@ function getCourseDescription(course) {
 
 function getCourseInstructor(course) {
   return course?.lecturer || course?.lecturer_name || course?.instructor_name || course?.instructor?.name || 'Marilyn Mango';
+}
+
+function getCourseInstructorAvatar(course) {
+  return course?.instructor?.avatar || course?.lecturer_avatar || course?.instructor_avatar || '';
 }
 
 function getCourseDuration(course) {
@@ -265,19 +268,7 @@ function renderCatalogPage() {
 
           <div class="catalog-filter-group">
             <h3>Instructor</h3>
-            <div class="catalog-instructor-list">
-              ${INSTRUCTORS.map((name) => `
-                <button
-                  type="button"
-                  class="catalog-instructor-item"
-                  data-filter-type="instructor"
-                  data-filter-value="${escapeHtml(normalize(name))}"
-                >
-                  <span class="catalog-instructor-avatar">${escapeHtml(name.charAt(0))}</span>
-                  <span>${escapeHtml(name)}</span>
-                </button>
-              `).join('')}
-            </div>
+            <div class="catalog-instructor-list" data-instructor-list></div>
           </div>
 
           <p class="catalog-filter-count" data-filter-count>0 Filters Active</p>
@@ -307,6 +298,56 @@ function renderCatalogPage() {
       </div>
     </section>
   `;
+}
+
+function getAvailableInstructors(courses) {
+  const seen = new Map();
+
+  courses.forEach((course) => {
+    const name = String(getCourseInstructor(course) ?? '').trim();
+    if (!name) return;
+
+    const key = normalize(name);
+    const avatar = getCourseInstructorAvatar(course);
+    const existing = seen.get(key);
+
+    if (!existing || (!existing.avatar && avatar)) {
+      seen.set(key, { name, avatar });
+    }
+  });
+
+  return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderInstructorFilters(root) {
+  const instructorRoot = root.querySelector('[data-instructor-list]');
+  if (!(instructorRoot instanceof HTMLElement)) return;
+
+  const instructors = getAvailableInstructors(catalogState.sourceCourses);
+
+  // Keep only selected instructors that still exist in current dataset.
+  const existingNormalized = new Set(instructors.map((item) => normalize(item.name)));
+  catalogState.selectedInstructors.forEach((value) => {
+    if (!existingNormalized.has(value)) {
+      catalogState.selectedInstructors.delete(value);
+    }
+  });
+
+  instructorRoot.innerHTML = instructors.map(({ name, avatar }) => `
+    <button
+      type="button"
+      class="catalog-instructor-item ${catalogState.selectedInstructors.has(normalize(name)) ? 'is-active' : ''}"
+      data-filter-type="instructor"
+      data-filter-value="${escapeHtml(normalize(name))}"
+    >
+      <span class="catalog-instructor-avatar">
+        ${avatar
+    ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy" />`
+    : escapeHtml(name.charAt(0))}
+      </span>
+      <span>${escapeHtml(name)}</span>
+    </button>
+  `).join('');
 }
 
 function applyFilterStyles(root) {
@@ -342,10 +383,12 @@ function renderCatalogResults(root) {
   }
 
   const filteredCourses = getFilteredCourses();
-  const totalActiveFilters = catalogState.selectedCategories.size + catalogState.selectedTopics.size + catalogState.selectedInstructors.size;
-  const visibleCourses = filteredCourses.slice(0, ITEMS_PER_PAGE);
+  const outOfCount = filteredCourses.length;
+  const computedLastPage = Math.max(1, Math.ceil(outOfCount / ITEMS_PER_PAGE));
+  catalogState.page = Math.min(catalogState.page, computedLastPage);
+  const startIndex = (catalogState.page - 1) * ITEMS_PER_PAGE;
+  const visibleCourses = filteredCourses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const outOfCount = totalActiveFilters > 0 ? filteredCourses.length : catalogState.total;
   showingRoot.textContent = `Showing ${visibleCourses.length} out of ${outOfCount}`;
 
   if (visibleCourses.length === 0) {
@@ -358,12 +401,9 @@ function renderCatalogResults(root) {
     cardsRoot.innerHTML = visibleCourses.map(buildCourseCard).join('');
   }
 
-  if (totalActiveFilters > 0) {
-    paginationRoot.innerHTML = '';
-  } else {
-    paginationRoot.innerHTML = buildPagination(catalogState.page, catalogState.lastPage);
-  }
+  paginationRoot.innerHTML = buildPagination(catalogState.page, computedLastPage);
 
+  renderInstructorFilters(root);
   applyFilterStyles(root);
 }
 
@@ -374,14 +414,33 @@ async function loadCatalogCourses(root) {
   }
 
   try {
-    const payload = await fetchCourses({
+    const firstPayload = await fetchCourses({
       sort: catalogState.sort,
-      page: catalogState.page,
+      page: 1,
     });
 
-    catalogState.sourceCourses = extractCourses(payload);
-    catalogState.total = extractTotal(payload, catalogState.sourceCourses.length);
-    catalogState.lastPage = extractLastPage(payload, catalogState.total);
+    const firstPageCourses = extractCourses(firstPayload);
+    const total = extractTotal(firstPayload, firstPageCourses.length);
+    const lastPage = extractLastPage(firstPayload, total);
+
+    const pageRequests = [];
+    for (let page = 2; page <= lastPage; page += 1) {
+      pageRequests.push(fetchCourses({ sort: catalogState.sort, page }));
+    }
+
+    const restPayloads = pageRequests.length > 0 ? await Promise.all(pageRequests) : [];
+    const restCourses = restPayloads.flatMap((payload) => extractCourses(payload));
+    const allCourses = [...firstPageCourses, ...restCourses];
+
+    const uniqueById = new Map();
+    allCourses.forEach((course) => {
+      const key = course?.id ?? `${getCourseTitle(course)}-${getCourseInstructor(course)}`;
+      if (!uniqueById.has(key)) uniqueById.set(key, course);
+    });
+
+    catalogState.sourceCourses = Array.from(uniqueById.values());
+    catalogState.total = catalogState.sourceCourses.length;
+    catalogState.lastPage = Math.max(1, Math.ceil(catalogState.total / ITEMS_PER_PAGE));
 
     renderCatalogResults(root);
   } catch (_error) {
@@ -462,7 +521,7 @@ function initCatalogPage() {
       const nextPage = Number(pageButton.dataset.page);
       if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage === catalogState.page) return;
       catalogState.page = nextPage;
-      loadCatalogCourses(pageRoot);
+      renderCatalogResults(pageRoot);
     }
   });
 
