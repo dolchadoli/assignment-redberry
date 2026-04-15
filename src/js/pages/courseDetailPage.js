@@ -11,6 +11,7 @@ import { uiStore } from '../state/uiStore.js';
 
 const ENROLLMENT_PROGRESS_KEY = 'demoEnrollmentProgressMap';
 const PROFILE_DRAFT_KEY = 'pendingProfileDraft';
+const ENROLLMENT_SELECTIONS_KEY = 'enrollmentSelectionMap';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -48,6 +49,21 @@ function getEnrollmentProgressMap() {
   } catch (_error) {
     return {};
   }
+}
+
+function getEnrollmentSelectionMap() {
+  try {
+    const raw = localStorage.getItem(ENROLLMENT_SELECTIONS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function setEnrollmentSelectionMap(map) {
+  localStorage.setItem(ENROLLMENT_SELECTIONS_KEY, JSON.stringify(map));
 }
 
 function getEnrollmentProgressOverride(enrollmentId) {
@@ -168,7 +184,20 @@ function getEnrollmentProgress(enrollment) {
   return Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
 }
 
+function getStoredEnrollmentSelection(enrollment) {
+  const map = getEnrollmentSelectionMap();
+  const enrollmentId = enrollment?.id;
+  const courseId = getEnrollmentCourseId(enrollment);
+  return (
+    map[`enrollment:${enrollmentId}`]
+    || map[`course:${courseId}`]
+    || null
+  );
+}
+
 function getEnrollmentScheduleLabel(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.scheduleLabel) return stored.scheduleLabel;
   const weekly = enrollment?.weeklySchedule || enrollment?.weekly_schedule;
   if (weekly?.label) return weekly.label;
   if (Array.isArray(weekly?.days)) return formatDays(weekly.days);
@@ -176,6 +205,8 @@ function getEnrollmentScheduleLabel(enrollment) {
 }
 
 function getEnrollmentTimeLabel(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.timeLabel) return stored.timeLabel;
   const slot = enrollment?.timeSlot || enrollment?.time_slot;
   if (slot?.label) return slot.label;
   if (slot?.startTime && slot?.endTime) return `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`;
@@ -183,11 +214,15 @@ function getEnrollmentTimeLabel(enrollment) {
 }
 
 function getEnrollmentSessionTypeLabel(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.sessionLabel) return stored.sessionLabel;
   const type = enrollment?.sessionType || enrollment?.session_type;
   return type?.name || 'Session selected';
 }
 
 function getEnrollmentLocationLabel(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.locationLabel) return stored.locationLabel;
   const type = enrollment?.sessionType || enrollment?.session_type;
   return type?.location || 'Location not specified';
 }
@@ -392,6 +427,9 @@ async function initCourseDetailPage(params = {}) {
   let selectedWeeklyId = null;
   let selectedTimeSlotId = null;
   let selectedSessionType = null;
+  let weeklySchedules = [];
+  let timeSlots = [];
+  let sessionTypes = [];
   let isSubmittingEnrollment = false;
   let isEnrolledInCurrentSelection = false;
   let currentEnrollment = null;
@@ -442,6 +480,39 @@ async function initCourseDetailPage(params = {}) {
 
   function extractUser(payload) {
     return payload?.data || payload?.user || payload || {};
+  }
+
+  function getCurrentSelectionSnapshot() {
+    const selectedWeekly = weeklySchedules.find((item) => item?.id === selectedWeeklyId) || null;
+    const selectedTime = timeSlots.find((item) => item?.id === selectedTimeSlotId) || null;
+    const selectedType = sessionTypes.find((item) => item?.id === selectedSessionType?.id) || selectedSessionType || null;
+
+    const scheduleLabel = selectedWeekly
+      ? (formatDays(selectedWeekly.days) || selectedWeekly.label || 'Schedule selected')
+      : 'Schedule selected';
+    const timeLabel = selectedTime
+      ? (selectedTime.label || `${formatTime(selectedTime.startTime)} - ${formatTime(selectedTime.endTime)}`)
+      : 'Time selected';
+    const sessionLabel = selectedType?.name || 'Session selected';
+    const locationLabel = selectedType?.location || 'Location not specified';
+
+    return { scheduleLabel, timeLabel, sessionLabel, locationLabel };
+  }
+
+  function persistSelectionForEnrollment(enrollment) {
+    if (!enrollment) return;
+    const map = getEnrollmentSelectionMap();
+    const snapshot = getCurrentSelectionSnapshot();
+    const enrollmentId = enrollment?.id;
+    const mappedCourseId = getEnrollmentCourseId(enrollment);
+
+    if (enrollmentId !== null && enrollmentId !== undefined) {
+      map[`enrollment:${enrollmentId}`] = snapshot;
+    }
+    if (Number.isFinite(mappedCourseId)) {
+      map[`course:${mappedCourseId}`] = snapshot;
+    }
+    setEnrollmentSelectionMap(map);
   }
 
   async function tryRepairProfileFromDraft() {
@@ -553,7 +624,7 @@ async function initCourseDetailPage(params = {}) {
 
     try {
       const payload = await fetchCourseSessionTypes(courseId, selectedWeeklyId, selectedTimeSlotId);
-      const sessionTypes = extractList(payload);
+      sessionTypes = extractList(payload);
 
       if (sessionTypes.length === 0) {
         selectedSessionType = null;
@@ -594,7 +665,7 @@ async function initCourseDetailPage(params = {}) {
 
     try {
       const payload = await fetchCourseTimeSlots(courseId, selectedWeeklyId);
-      const timeSlots = extractList(payload);
+      timeSlots = extractList(payload);
 
       if (timeSlots.length === 0) {
         selectedTimeSlotId = null;
@@ -668,6 +739,7 @@ async function initCourseDetailPage(params = {}) {
     try {
       const payload = await fetchCourseWeeklySchedules(courseId);
       const schedules = extractList(payload);
+      weeklySchedules = schedules;
 
       if (schedules.length === 0) {
         weeklyOptionsRoot.innerHTML = '<span class="course-detail-pill">No schedules</span>';
@@ -800,6 +872,8 @@ async function initCourseDetailPage(params = {}) {
           currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
         }
 
+        persistSelectionForEnrollment(currentEnrollment);
+
         if (currentEnrollment) {
           renderEnrolledPanel();
         }
@@ -828,6 +902,8 @@ async function initCourseDetailPage(params = {}) {
                 const enrollments = extractList(enrollmentsPayload);
                 currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
               }
+
+              persistSelectionForEnrollment(currentEnrollment);
 
               isEnrolledInCurrentSelection = true;
               enrollErrorMessage = '';
@@ -870,7 +946,6 @@ async function initCourseDetailPage(params = {}) {
         progress: next,
       };
       renderEnrolledPanel();
-      uiStore.openSidebar('enrolled-courses');
       return;
     }
 

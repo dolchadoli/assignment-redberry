@@ -8,10 +8,22 @@ function escapeHtml(value) {
 }
 
 const ENROLLMENT_PROGRESS_KEY = 'demoEnrollmentProgressMap';
+const ENROLLMENT_SELECTIONS_KEY = 'enrollmentSelectionMap';
 
 function getEnrollmentProgressMap() {
   try {
     const raw = localStorage.getItem(ENROLLMENT_PROGRESS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function getEnrollmentSelectionMap() {
+  try {
+    const raw = localStorage.getItem(ENROLLMENT_SELECTIONS_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : {};
@@ -65,28 +77,55 @@ function getEnrollmentRating(enrollment) {
   return Number.isFinite(raw) && raw > 0 ? raw.toFixed(1) : '4.9';
 }
 
-function getEnrollmentPrice(enrollment) {
-  const total = Number(
-    enrollment?.totalPrice
-    ?? enrollment?.final_price
-    ?? enrollment?.finalPrice
-    ?? enrollment?.price
-    ?? getEnrollmentCourse(enrollment)?.basePrice
-    ?? getEnrollmentCourse(enrollment)?.price
-    ?? 0
-  );
-  return Number.isFinite(total) ? total : 0;
-}
-
 function getEnrollmentSchedule(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.scheduleLabel) return stored.scheduleLabel;
   const weekly = enrollment?.weeklySchedule || enrollment?.weekly_schedule;
   if (weekly?.days) return formatDays(weekly.days);
   return weekly?.label || '';
 }
 
 function getEnrollmentSessionType(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.sessionLabel) return stored.sessionLabel;
   const type = enrollment?.sessionType || enrollment?.session_type;
   return type?.name || '';
+}
+
+function getEnrollmentCourseId(enrollment) {
+  return Number(
+    enrollment?.course?.id
+    ?? enrollment?.course_id
+    ?? enrollment?.courseId
+    ?? enrollment?.id
+  );
+}
+
+function getStoredEnrollmentSelection(enrollment) {
+  const map = getEnrollmentSelectionMap();
+  const enrollmentId = enrollment?.id;
+  const courseId = getEnrollmentCourseId(enrollment);
+  return (
+    map[`enrollment:${enrollmentId}`]
+    || map[`course:${courseId}`]
+    || null
+  );
+}
+
+function getEnrollmentTime(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.timeLabel) return stored.timeLabel;
+  const slot = enrollment?.timeSlot || enrollment?.time_slot;
+  if (slot?.label) return slot.label;
+  if (slot?.startTime && slot?.endTime) return `${slot.startTime} - ${slot.endTime}`;
+  return '';
+}
+
+function getEnrollmentLocation(enrollment) {
+  const stored = getStoredEnrollmentSelection(enrollment);
+  if (stored?.locationLabel) return stored.locationLabel;
+  const type = enrollment?.sessionType || enrollment?.session_type;
+  return type?.location || '';
 }
 
 function getEnrollmentProgress(enrollment) {
@@ -103,31 +142,41 @@ function getEnrollmentProgress(enrollment) {
 }
 
 function renderEnrollmentCard(enrollment) {
+  const courseId = getEnrollmentCourseId(enrollment);
   const title = escapeHtml(getEnrollmentTitle(enrollment));
   const image = escapeHtml(getEnrollmentImage(enrollment));
   const instructor = escapeHtml(getEnrollmentInstructor(enrollment));
   const rating = escapeHtml(getEnrollmentRating(enrollment));
-  const price = escapeHtml(getEnrollmentPrice(enrollment).toFixed(0));
   const schedule = escapeHtml(getEnrollmentSchedule(enrollment));
+  const time = escapeHtml(getEnrollmentTime(enrollment));
   const sessionType = escapeHtml(getEnrollmentSessionType(enrollment));
+  const location = escapeHtml(getEnrollmentLocation(enrollment));
   const progress = getEnrollmentProgress(enrollment);
+  const detailsHref = Number.isFinite(courseId) && courseId > 0 ? `#/courses/${courseId}` : '#/courses';
 
   return `
     <article class="enrolled-sidebar-card">
       <img class="enrolled-sidebar-card-image" src="${image}" alt="${title}" />
       <div class="enrolled-sidebar-card-main">
         <div class="enrolled-sidebar-card-top">
-          <p class="enrolled-sidebar-card-instructor">${instructor}</p>
+          <p class="enrolled-sidebar-card-instructor">Instructor ${instructor}</p>
           <p class="enrolled-sidebar-card-rating"><span>&#9733;</span> ${rating}</p>
         </div>
         <h3 class="enrolled-sidebar-card-title">${title}</h3>
-        <p class="enrolled-sidebar-card-meta">${schedule}${sessionType ? ` | ${sessionType}` : ''}</p>
-        <div class="enrolled-sidebar-card-footer">
-          <p class="enrolled-sidebar-card-price">$${price}</p>
-          <p class="enrolled-sidebar-card-progress">${progress}% Complete</p>
+        <div class="enrolled-sidebar-card-meta-list">
+          <p class="enrolled-sidebar-card-meta"><span aria-hidden="true">&#128197;</span><span>${schedule || 'Schedule selected'}</span></p>
+          <p class="enrolled-sidebar-card-meta"><span aria-hidden="true">&#9716;</span><span>${time || 'Time selected'}</span></p>
+          <p class="enrolled-sidebar-card-meta"><span aria-hidden="true">&#9874;</span><span>${sessionType || 'Session selected'}</span></p>
+          <p class="enrolled-sidebar-card-meta"><span aria-hidden="true">&#128205;</span><span>${location || 'Location not specified'}</span></p>
         </div>
-        <div class="enrolled-sidebar-card-progressbar">
-          <span style="width: ${progress}%"></span>
+        <div class="enrolled-sidebar-card-bottom">
+          <div class="enrolled-sidebar-card-progress-wrap">
+            <p class="enrolled-sidebar-card-progress">${progress}% Complete</p>
+            <div class="enrolled-sidebar-card-progressbar">
+              <span style="width: ${progress}%"></span>
+            </div>
+          </div>
+          <a class="enrolled-sidebar-card-view" href="${detailsHref}" data-close-sidebar>View</a>
         </div>
       </div>
     </article>
