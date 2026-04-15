@@ -113,6 +113,27 @@
   gap: 8px;
 }
 
+.register-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+}
+
+.register-inline-fields .form-group {
+  min-width: 0;
+}
+
+.register-age-field input {
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.register-age-field input::-webkit-outer-spin-button,
+.register-age-field input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .form-group label {
   font-size: 14px;
   color: #475467;
@@ -121,8 +142,10 @@
 .form-group input[type='text'],
 .form-group input[type='email'],
 .form-group input[type='password'],
+.form-group input[type='number'],
 .form-group input[type='file'] {
   width: 100%;
+  box-sizing: border-box;
   padding: 12px 14px;
   border: 1px solid #d0d5dd;
   border-radius: 12px;

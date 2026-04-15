@@ -20,6 +20,10 @@ async function request(endpoint, options = {}) {
     body: options.body || null,
   };
 
+  if (!config.headers.Accept) {
+    config.headers.Accept = 'application/json';
+  }
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

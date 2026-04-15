@@ -4,8 +4,13 @@
   fetchCourseTimeSlots,
   fetchCourseSessionTypes,
 } from '../api/coursesApi.js';
+import { createEnrollment, fetchEnrollments } from '../api/enrollmentsApi.js';
+import { fetchCurrentUser, updateProfile } from '../services/authService.js';
 import { authStore } from '../state/authStore.js';
 import { uiStore } from '../state/uiStore.js';
+
+const ENROLLMENT_PROGRESS_KEY = 'demoEnrollmentProgressMap';
+const PROFILE_DRAFT_KEY = 'pendingProfileDraft';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -20,14 +25,42 @@ function extractRecord(payload) {
   if (!payload) return null;
   if (payload.data && !Array.isArray(payload.data)) return payload.data;
   if (payload.course) return payload.course;
+  if (payload.enrollment) return payload.enrollment;
+  if (payload.item) return payload.item;
   return payload;
 }
 
 function extractList(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.enrollments)) return payload.enrollments;
+  if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
+}
+
+function getEnrollmentProgressMap() {
+  try {
+    const raw = localStorage.getItem(ENROLLMENT_PROGRESS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function getEnrollmentProgressOverride(enrollmentId) {
+  const map = getEnrollmentProgressMap();
+  const raw = Number(map[String(enrollmentId)]);
+  if (!Number.isFinite(raw)) return null;
+  return Math.max(0, Math.min(100, raw));
+}
+
+function setEnrollmentProgressOverride(enrollmentId, progress) {
+  const map = getEnrollmentProgressMap();
+  map[String(enrollmentId)] = Math.max(0, Math.min(100, Number(progress) || 0));
+  localStorage.setItem(ENROLLMENT_PROGRESS_KEY, JSON.stringify(map));
 }
 
 function formatTime(value) {
@@ -91,6 +124,16 @@ function getBasePrice(course) {
   return Number(course?.basePrice || course?.price || 0) || 0;
 }
 
+function getAvailableSeats(sessionType) {
+  const raw = Number(
+    sessionType?.availableSeats
+    ?? sessionType?.available_seats
+    ?? sessionType?.seats
+    ?? 0
+  );
+  return Number.isFinite(raw) ? raw : 0;
+}
+
 function getRating(course) {
   if (Array.isArray(course?.reviews) && course.reviews.length > 0) {
     const total = course.reviews.reduce((sum, review) => sum + Number(review?.rating || 0), 0);
@@ -106,6 +149,107 @@ function formatDays(days) {
   };
   if (days.length === 1) return map[days[0]] || days[0];
   return `${map[days[0]] || days[0]} - ${map[days[days.length - 1]] || days[days.length - 1]}`;
+}
+
+function getEnrollmentCourseId(enrollment) {
+  return Number(
+    enrollment?.course?.id
+    ?? enrollment?.course_id
+    ?? enrollment?.courseId
+    ?? enrollment?.id
+  );
+}
+
+function getEnrollmentProgress(enrollment) {
+  const enrollmentId = enrollment?.id || getEnrollmentCourseId(enrollment);
+  const override = getEnrollmentProgressOverride(enrollmentId);
+  if (override !== null) return override;
+  const raw = Number(enrollment?.progress ?? enrollment?.progress_percentage ?? 0);
+  return Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
+}
+
+function getEnrollmentScheduleLabel(enrollment) {
+  const weekly = enrollment?.weeklySchedule || enrollment?.weekly_schedule;
+  if (weekly?.label) return weekly.label;
+  if (Array.isArray(weekly?.days)) return formatDays(weekly.days);
+  return 'Schedule selected';
+}
+
+function getEnrollmentTimeLabel(enrollment) {
+  const slot = enrollment?.timeSlot || enrollment?.time_slot;
+  if (slot?.label) return slot.label;
+  if (slot?.startTime && slot?.endTime) return `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`;
+  return 'Time selected';
+}
+
+function getEnrollmentSessionTypeLabel(enrollment) {
+  const type = enrollment?.sessionType || enrollment?.session_type;
+  return type?.name || 'Session selected';
+}
+
+function getEnrollmentLocationLabel(enrollment) {
+  const type = enrollment?.sessionType || enrollment?.session_type;
+  return type?.location || 'Location not specified';
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const stringValue = String(value).trim();
+    if (stringValue.length > 0) return stringValue;
+  }
+  return '';
+}
+
+function collectMissingProfileFields(user) {
+  const fullName = firstNonEmpty(user?.full_name, user?.fullName, user?.name, user?.username);
+  const mobile = firstNonEmpty(
+    user?.mobile,
+    user?.mobile_number,
+    user?.mobileNumber,
+    user?.phone,
+    user?.phone_number,
+    user?.phoneNumber,
+    user?.mobile_local,
+    user?.phone_local
+  );
+  const ageRaw = Number(user?.age ?? user?.user_age ?? user?.years);
+  const age = Number.isFinite(ageRaw) ? ageRaw : null;
+
+  const missing = [];
+  if (!fullName) missing.push('full name');
+  if (!mobile) missing.push('mobile');
+  if (age === null || age < 16) missing.push('age (16+)');
+  return missing;
+}
+
+function normalizeGeorgianMobile(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (/^5\d{8}$/.test(digits)) {
+    return {
+      local: digits,
+      international: `+995${digits}`,
+    };
+  }
+  if (/^9955\d{8}$/.test(digits)) {
+    const local = digits.slice(3);
+    return {
+      local,
+      international: `+${digits}`,
+    };
+  }
+  return null;
+}
+
+function readProfileDraft() {
+  try {
+    const raw = localStorage.getItem(PROFILE_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (_error) {
+    return null;
+  }
 }
 
 function setAccordionItemState(item, isOpen) {
@@ -154,46 +298,52 @@ function renderCourseDetailPage(params = {}) {
         </div>
 
         <aside class="course-detail-side" data-accordion-root>
-          <div class="course-detail-accordion">
-            <div class="course-detail-acc-item is-open" data-acc-item="weekly">
-              <button type="button" class="course-detail-acc-trigger" data-acc-trigger="weekly">1) Weekly Schedule <span data-acc-chevron>^</span></button>
-              <div class="course-detail-acc-content">
-                <div class="course-detail-option-grid" data-weekly-options></div>
+          <div class="course-detail-selection-panel" data-selection-panel>
+            <div class="course-detail-accordion">
+              <div class="course-detail-acc-item is-open" data-acc-item="weekly">
+                <button type="button" class="course-detail-acc-trigger" data-acc-trigger="weekly">1) Weekly Schedule <span data-acc-chevron>^</span></button>
+                <div class="course-detail-acc-content">
+                  <div class="course-detail-option-grid" data-weekly-options></div>
+                </div>
+              </div>
+
+              <div class="course-detail-acc-item" data-acc-item="time">
+                <button type="button" class="course-detail-acc-trigger" data-acc-trigger="time">2) Time Slot <span data-acc-chevron>v</span></button>
+                <div class="course-detail-acc-content">
+                  <div class="course-detail-option-grid" data-time-options></div>
+                </div>
+              </div>
+
+              <div class="course-detail-acc-item" data-acc-item="session">
+                <button type="button" class="course-detail-acc-trigger" data-acc-trigger="session">3) Session Type <span data-acc-chevron>v</span></button>
+                <div class="course-detail-acc-content">
+                  <div class="course-detail-option-grid" data-session-options></div>
+                </div>
               </div>
             </div>
 
-            <div class="course-detail-acc-item" data-acc-item="time">
-              <button type="button" class="course-detail-acc-trigger" data-acc-trigger="time">2) Time Slot <span data-acc-chevron>v</span></button>
-              <div class="course-detail-acc-content">
-                <div class="course-detail-option-grid" data-time-options></div>
+            <div class="course-detail-price-card">
+              <div class="course-detail-price-top">
+                <span>Total Price</span>
+                <strong data-total-price>$0</strong>
               </div>
-            </div>
-
-            <div class="course-detail-acc-item" data-acc-item="session">
-              <button type="button" class="course-detail-acc-trigger" data-acc-trigger="session">3) Session Type <span data-acc-chevron>v</span></button>
-              <div class="course-detail-acc-content">
-                <div class="course-detail-option-grid" data-session-options></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="course-detail-price-card">
-            <div class="course-detail-price-top">
-              <span>Total Price</span>
-              <strong data-total-price>$0</strong>
-            </div>
             <p class="course-detail-price-line"><span>Base Price</span><span data-base-price>$0</span></p>
             <p class="course-detail-price-line"><span>Session Type</span><span data-session-modifier>+ $0</span></p>
             <p class="course-detail-price-line"><span>Available Seats</span><span data-seat-count>0</span></p>
             <button type="button" class="course-detail-enroll-btn" data-enroll-btn>Enroll Now</button>
+            <p class="course-detail-enroll-error" data-enroll-error></p>
+          </div>
           </div>
 
-          <div class="course-detail-profile-note">
-            <div>
-              <p class="course-detail-profile-note-title">Complete Your Profile</p>
-              <p class="course-detail-profile-note-text">You need to fill in your profile details before enrolling in this course.</p>
-            </div>
-            <button type="button" class="course-detail-profile-note-btn" data-profile-btn>Complete -&gt;</button>
+          <div class="course-detail-enrolled-panel is-hidden" data-enrolled-panel>
+            <p class="course-detail-enrolled-badge">Enrolled</p>
+            <p class="course-detail-enrolled-line" data-enrolled-schedule>Schedule selected</p>
+            <p class="course-detail-enrolled-line" data-enrolled-time>Time selected</p>
+            <p class="course-detail-enrolled-line" data-enrolled-session>Session selected</p>
+            <p class="course-detail-enrolled-line" data-enrolled-location>Location not specified</p>
+            <p class="course-detail-enrolled-progress-text"><span data-enrolled-progress>0%</span> Complete</p>
+            <div class="course-detail-enrolled-progressbar"><span data-enrolled-progress-fill style="width: 0%"></span></div>
+            <button type="button" class="course-detail-enrolled-complete-btn" data-complete-course-btn>Complete Course</button>
           </div>
         </aside>
       </div>
@@ -226,12 +376,44 @@ async function initCourseDetailPage(params = {}) {
   const modifierNode = root.querySelector('[data-session-modifier]');
   const seatCountNode = root.querySelector('[data-seat-count]');
   const enrollBtn = root.querySelector('[data-enroll-btn]');
+  const enrollErrorNode = root.querySelector('[data-enroll-error]');
   const accordionRoot = root.querySelector('[data-accordion-root]');
+  const selectionPanel = root.querySelector('[data-selection-panel]');
+  const enrolledPanel = root.querySelector('[data-enrolled-panel]');
+  const enrolledScheduleNode = root.querySelector('[data-enrolled-schedule]');
+  const enrolledTimeNode = root.querySelector('[data-enrolled-time]');
+  const enrolledSessionNode = root.querySelector('[data-enrolled-session]');
+  const enrolledLocationNode = root.querySelector('[data-enrolled-location]');
+  const enrolledProgressNode = root.querySelector('[data-enrolled-progress]');
+  const enrolledProgressFillNode = root.querySelector('[data-enrolled-progress-fill]');
+  const completeCourseBtn = root.querySelector('[data-complete-course-btn]');
 
   let basePrice = 0;
   let selectedWeeklyId = null;
   let selectedTimeSlotId = null;
   let selectedSessionType = null;
+  let isSubmittingEnrollment = false;
+  let isEnrolledInCurrentSelection = false;
+  let currentEnrollment = null;
+  let enrollErrorMessage = '';
+
+  function getErrorMessage(error) {
+    const fallback = 'Enrollment failed. Please try again.';
+    if (!error || typeof error !== 'object') return fallback;
+    const errorsObj = error?.data?.errors;
+    if (errorsObj && typeof errorsObj === 'object') {
+      const allMessages = Object.values(errorsObj)
+        .flatMap((value) => (Array.isArray(value) ? value : []))
+        .filter(Boolean)
+        .map((value) => String(value));
+      if (allMessages.length > 0) {
+        return allMessages.join(' ');
+      }
+    }
+    const message = String(error?.data?.message || '').trim();
+    if (message) return message;
+    return fallback;
+  }
 
   function updatePriceCard() {
     const modifier = Number(selectedSessionType?.priceModifier || 0) || 0;
@@ -240,15 +422,128 @@ async function initCourseDetailPage(params = {}) {
     if (totalPriceNode) totalPriceNode.textContent = `$${total.toFixed(0)}`;
     if (basePriceNode) basePriceNode.textContent = `$${basePrice.toFixed(0)}`;
     if (modifierNode) modifierNode.textContent = `+ $${modifier.toFixed(0)}`;
-    if (seatCountNode) seatCountNode.textContent = String(selectedSessionType?.availableSeats ?? 0);
+    if (seatCountNode) seatCountNode.textContent = String(getAvailableSeats(selectedSessionType));
 
     if (enrollBtn instanceof HTMLButtonElement) {
       const isLoggedIn = authStore.isAuthenticated();
-      const availableSeats = Number(selectedSessionType?.availableSeats ?? 0);
-      enrollBtn.textContent = isLoggedIn ? 'Enroll Now' : 'Log In To Enroll';
-      enrollBtn.classList.toggle('is-ready', isLoggedIn && availableSeats > 0);
+      const availableSeats = getAvailableSeats(selectedSessionType);
+      enrollBtn.textContent = isSubmittingEnrollment
+        ? 'Enrolling...'
+        : (isEnrolledInCurrentSelection ? 'Enrolled' : 'Enroll Now');
+      enrollBtn.classList.toggle('is-ready', isEnrolledInCurrentSelection || !isLoggedIn || availableSeats > 0);
       enrollBtn.classList.toggle('btn-login', !isLoggedIn);
-      enrollBtn.disabled = availableSeats <= 0;
+      enrollBtn.disabled = isSubmittingEnrollment || isEnrolledInCurrentSelection || (isLoggedIn && availableSeats <= 0);
+    }
+
+    if (enrollErrorNode instanceof HTMLElement) {
+      enrollErrorNode.textContent = enrollErrorMessage;
+    }
+  }
+
+  function extractUser(payload) {
+    return payload?.data || payload?.user || payload || {};
+  }
+
+  async function tryRepairProfileFromDraft() {
+    const draft = readProfileDraft();
+    if (!draft) return false;
+
+    const username = String(draft.username || '').trim();
+    const normalized = normalizeGeorgianMobile(draft.mobile);
+    const age = Number(draft.age);
+    if (!normalized || !Number.isFinite(age) || age < 16) return false;
+
+    const mobileCandidates = [normalized.local, `995${normalized.local}`, normalized.international];
+    const endpoints = ['/profile', '/me', '/user/profile'];
+    const methods = ['PUT', 'POST', 'PATCH'];
+
+    for (const mobileValue of mobileCandidates) {
+      const payloadBuilders = [
+        () => {
+          const body = new FormData();
+          body.append('full_name', username);
+          body.append('fullName', username);
+          body.append('name', username);
+          body.append('age', String(age));
+          body.append('user_age', String(age));
+          body.append('years', String(age));
+          body.append('mobile', mobileValue);
+          body.append('mobile_number', mobileValue);
+          body.append('phone', mobileValue);
+          body.append('phone_number', mobileValue);
+          body.append('mobile_local', normalized.local);
+          body.append('phone_local', normalized.local);
+          return body;
+        },
+        () => ({
+          full_name: username,
+          fullName: username,
+          name: username,
+          age,
+          user_age: age,
+          years: age,
+          mobile: mobileValue,
+          mobile_number: mobileValue,
+          phone: mobileValue,
+          phone_number: mobileValue,
+          mobile_local: normalized.local,
+          phone_local: normalized.local,
+        }),
+        () => ({
+          full_name: username,
+          age,
+          mobile: mobileValue,
+          phone: mobileValue,
+        }),
+      ];
+
+      for (const buildPayload of payloadBuilders) {
+        for (const endpoint of endpoints) {
+          for (const method of methods) {
+            try {
+              await updateProfile(buildPayload(), { method, endpoint });
+              const mePayload = await fetchCurrentUser();
+              const me = extractUser(mePayload);
+              const missing = collectMissingProfileFields(me);
+              const missingCritical = missing.includes('mobile') || missing.includes('age (16+)');
+              if (!missingCritical) {
+                return true;
+              }
+            } catch (_error) {
+              // Try next combination.
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function renderEnrolledPanel() {
+    if (!(selectionPanel instanceof HTMLElement) || !(enrolledPanel instanceof HTMLElement) || !currentEnrollment) return;
+
+    selectionPanel.classList.add('is-hidden');
+    enrolledPanel.classList.remove('is-hidden');
+
+    const progress = getEnrollmentProgress(currentEnrollment);
+    if (enrolledScheduleNode) enrolledScheduleNode.textContent = getEnrollmentScheduleLabel(currentEnrollment);
+    if (enrolledTimeNode) enrolledTimeNode.textContent = getEnrollmentTimeLabel(currentEnrollment);
+    if (enrolledSessionNode) enrolledSessionNode.textContent = getEnrollmentSessionTypeLabel(currentEnrollment);
+    if (enrolledLocationNode) enrolledLocationNode.textContent = getEnrollmentLocationLabel(currentEnrollment);
+    if (enrolledProgressNode) enrolledProgressNode.textContent = `${progress}%`;
+    if (enrolledProgressFillNode instanceof HTMLElement) {
+      enrolledProgressFillNode.style.width = `${progress}%`;
+    }
+
+    if (completeCourseBtn instanceof HTMLButtonElement) {
+      if (progress >= 100) {
+        completeCourseBtn.textContent = 'Completed ✓';
+        completeCourseBtn.disabled = true;
+      } else {
+        completeCourseBtn.textContent = 'Complete Course';
+        completeCourseBtn.disabled = false;
+      }
     }
   }
 
@@ -262,19 +557,20 @@ async function initCourseDetailPage(params = {}) {
 
       if (sessionTypes.length === 0) {
         selectedSessionType = null;
+        isEnrolledInCurrentSelection = false;
         sessionOptionsRoot.innerHTML = '<span class="course-detail-pill">No session types</span>';
         updatePriceCard();
         return;
       }
 
       if (!selectedSessionType || !sessionTypes.some((it) => it.id === selectedSessionType.id)) {
-        selectedSessionType = sessionTypes[0];
+        selectedSessionType = sessionTypes.find((it) => getAvailableSeats(it) > 0) || sessionTypes[0];
       }
 
       sessionOptionsRoot.innerHTML = sessionTypes.map((type) => {
         const isActive = selectedSessionType?.id === type.id;
         const modifier = Number(type.priceModifier || 0);
-        const seats = Number(type.availableSeats || 0);
+        const seats = getAvailableSeats(type);
         return `
           <button type="button" class="course-detail-week-btn course-detail-week-btn--session ${isActive ? 'is-active' : ''}" data-session-id="${type.id}">
             <span class="course-detail-option-main">${escapeHtml(type.name)}</span>
@@ -287,6 +583,7 @@ async function initCourseDetailPage(params = {}) {
     } catch (_error) {
       sessionOptionsRoot.innerHTML = '<span class="course-detail-pill">Failed to load</span>';
       selectedSessionType = null;
+      isEnrolledInCurrentSelection = false;
       updatePriceCard();
     }
   }
@@ -302,6 +599,7 @@ async function initCourseDetailPage(params = {}) {
       if (timeSlots.length === 0) {
         selectedTimeSlotId = null;
         selectedSessionType = null;
+        isEnrolledInCurrentSelection = false;
         timeOptionsRoot.innerHTML = '<span class="course-detail-pill">No time slots</span>';
         if (sessionOptionsRoot) sessionOptionsRoot.innerHTML = '<span class="course-detail-pill">Select time slot first</span>';
         updatePriceCard();
@@ -330,6 +628,7 @@ async function initCourseDetailPage(params = {}) {
       timeOptionsRoot.innerHTML = '<span class="course-detail-pill">Failed to load</span>';
       if (sessionOptionsRoot) sessionOptionsRoot.innerHTML = '<span class="course-detail-pill">Failed to load</span>';
       selectedSessionType = null;
+      isEnrolledInCurrentSelection = false;
       updatePriceCard();
     }
   }
@@ -387,6 +686,20 @@ async function initCourseDetailPage(params = {}) {
 
   await loadTimeSlots();
 
+  if (authStore.isAuthenticated()) {
+    try {
+      const enrollmentsPayload = await fetchEnrollments();
+      const enrollments = extractList(enrollmentsPayload);
+      currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
+      if (currentEnrollment) {
+        isEnrolledInCurrentSelection = true;
+        renderEnrolledPanel();
+      }
+    } catch (_error) {
+      currentEnrollment = null;
+    }
+  }
+
   if (accordionRoot instanceof HTMLElement) {
     syncAccordionHeights(accordionRoot);
   }
@@ -411,6 +724,8 @@ async function initCourseDetailPage(params = {}) {
       selectedWeeklyId = nextId;
       selectedTimeSlotId = null;
       selectedSessionType = null;
+      isEnrolledInCurrentSelection = false;
+      enrollErrorMessage = '';
       weeklyOptionsRoot?.querySelectorAll('[data-weekly-id]').forEach((btn) => {
         btn.classList.toggle('is-active', Number(btn.getAttribute('data-weekly-id')) === selectedWeeklyId);
       });
@@ -425,6 +740,8 @@ async function initCourseDetailPage(params = {}) {
       if (!Number.isFinite(nextId) || nextId === selectedTimeSlotId) return;
       selectedTimeSlotId = nextId;
       selectedSessionType = null;
+      isEnrolledInCurrentSelection = false;
+      enrollErrorMessage = '';
       timeOptionsRoot?.querySelectorAll('[data-time-slot-id]').forEach((btn) => {
         btn.classList.toggle('is-active', Number(btn.getAttribute('data-time-slot-id')) === selectedTimeSlotId);
       });
@@ -440,6 +757,8 @@ async function initCourseDetailPage(params = {}) {
       const payload = await fetchCourseSessionTypes(courseId, selectedWeeklyId, selectedTimeSlotId);
       const sessionTypes = extractList(payload);
       selectedSessionType = sessionTypes.find((type) => type.id === nextId) || null;
+      isEnrolledInCurrentSelection = false;
+      enrollErrorMessage = '';
       sessionOptionsRoot?.querySelectorAll('[data-session-id]').forEach((btn) => {
         btn.classList.toggle('is-active', Number(btn.getAttribute('data-session-id')) === nextId);
       });
@@ -447,14 +766,114 @@ async function initCourseDetailPage(params = {}) {
       return;
     }
 
-    if (target.closest('[data-enroll-btn]') && !authStore.isAuthenticated()) {
-      uiStore.openModal('login');
+    if (target.closest('[data-enroll-btn]')) {
+      if (!authStore.isAuthenticated()) {
+        uiStore.openModal('login');
+        return;
+      }
+
+      if (isSubmittingEnrollment || !selectedWeeklyId || !selectedTimeSlotId || !selectedSessionType?.id) {
+        return;
+      }
+
+      try {
+        isSubmittingEnrollment = true;
+        enrollErrorMessage = '';
+        updatePriceCard();
+
+        const enrollmentPayload = await createEnrollment({
+          courseId,
+          courseScheduleId: selectedSessionType?.courseScheduleId ?? selectedSessionType?.course_schedule_id,
+          weeklyScheduleId: selectedWeeklyId,
+          timeSlotId: selectedTimeSlotId,
+          sessionTypeId: selectedSessionType.id,
+        });
+
+        isEnrolledInCurrentSelection = true;
+
+        const createdEnrollment = extractRecord(enrollmentPayload);
+        if (createdEnrollment) {
+          currentEnrollment = createdEnrollment;
+        } else {
+          const enrollmentsPayload = await fetchEnrollments();
+          const enrollments = extractList(enrollmentsPayload);
+          currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
+        }
+
+        if (currentEnrollment) {
+          renderEnrolledPanel();
+        }
+
+        uiStore.openSidebar('enrolled-courses');
+      } catch (_error) {
+        enrollErrorMessage = getErrorMessage(_error);
+
+        if (enrollErrorMessage.toLowerCase().includes('complete your profile')) {
+          const repaired = await tryRepairProfileFromDraft();
+          if (repaired) {
+            try {
+              const retryEnrollmentPayload = await createEnrollment({
+                courseId,
+                courseScheduleId: selectedSessionType?.courseScheduleId ?? selectedSessionType?.course_schedule_id,
+                weeklyScheduleId: selectedWeeklyId,
+                timeSlotId: selectedTimeSlotId,
+                sessionTypeId: selectedSessionType.id,
+              });
+
+              const retryCreated = extractRecord(retryEnrollmentPayload);
+              if (retryCreated) {
+                currentEnrollment = retryCreated;
+              } else {
+                const enrollmentsPayload = await fetchEnrollments();
+                const enrollments = extractList(enrollmentsPayload);
+                currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
+              }
+
+              isEnrolledInCurrentSelection = true;
+              enrollErrorMessage = '';
+              if (currentEnrollment) {
+                renderEnrolledPanel();
+              }
+              uiStore.openSidebar('enrolled-courses');
+              return;
+            } catch (retryError) {
+              enrollErrorMessage = getErrorMessage(retryError);
+            }
+          }
+
+          try {
+            const userPayload = await fetchCurrentUser();
+            const user = extractUser(userPayload);
+            const missing = collectMissingProfileFields(user);
+            if (missing.length > 0) {
+              enrollErrorMessage = `Please complete your profile: ${missing.join(', ')}.`;
+            }
+          } catch (_fetchProfileError) {
+            // Keep original message if profile fetch fails.
+          }
+        }
+      } finally {
+        isSubmittingEnrollment = false;
+        updatePriceCard();
+      }
       return;
     }
 
-    if (target.closest('[data-profile-btn]') && !authStore.isAuthenticated()) {
-      uiStore.openModal('login');
+    if (target.closest('[data-complete-course-btn]')) {
+      if (!currentEnrollment) return;
+      const enrollmentId = currentEnrollment?.id || getEnrollmentCourseId(currentEnrollment);
+      const current = getEnrollmentProgress(currentEnrollment);
+      const next = Math.min(100, current + 10);
+      setEnrollmentProgressOverride(enrollmentId, next);
+      currentEnrollment = {
+        ...currentEnrollment,
+        progress: next,
+      };
+      renderEnrolledPanel();
+      uiStore.openSidebar('enrolled-courses');
+      return;
     }
+
   });
 }
 

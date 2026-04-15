@@ -6,4 +6,11 @@ function fetchCurrentUser() {
   });
 }
 
-export { fetchCurrentUser };
+function updateProfile(body, { method = 'PUT', endpoint = '/profile' } = {}) {
+  return request(endpoint, {
+    method,
+    body,
+  });
+}
+
+export { fetchCurrentUser, updateProfile };

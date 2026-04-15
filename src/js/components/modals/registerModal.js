@@ -1,30 +1,84 @@
 import { uiStore } from '../../state/uiStore.js';
 import { authStore } from '../../state/authStore.js';
-import { register, login } from '../../services/authService.js';
+import { register, login, updateProfile, fetchCurrentUser } from '../../services/authService.js';
 import { isValidEmail, isRequired, hasMinLength } from '../../utils/validators.js';
 import { createOverlayModal } from './modalBase.js';
 
 const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PROFILE_DRAFT_KEY = 'pendingProfileDraft';
 
-function getErrorMessage(error) {
-  const source = error?.data?.errors ?? error?.data?.message ?? error?.message;
+const REGISTER_ERROR_PRIORITY = [
+  'username',
+  'email',
+  'mobile',
+  'mobile_number',
+  'phone',
+  'phone_number',
+  'age',
+  'password',
+  'password_confirmation',
+];
 
-  if (typeof source === 'string') {
-    return source;
-  }
+function getErrorMessage(error, priority = REGISTER_ERROR_PRIORITY) {
+  const validationErrors = error?.data?.errors;
+  if (validationErrors && typeof validationErrors === 'object' && !Array.isArray(validationErrors)) {
+    for (const key of priority) {
+      const value = validationErrors[key];
+      const firstMessage = Array.isArray(value) ? value.find(Boolean) : value;
+      if (firstMessage) {
+        return String(firstMessage);
+      }
+    }
 
-  if (Array.isArray(source) && source.length > 0) {
-    return source.join(', ');
-  }
-
-  if (source && typeof source === 'object') {
-    const values = Object.values(source).flat();
-    if (values.length > 0) {
-      return String(values[0]);
+    for (const value of Object.values(validationErrors)) {
+      const firstMessage = Array.isArray(value) ? value.find(Boolean) : value;
+      if (firstMessage) {
+        return String(firstMessage);
+      }
     }
   }
 
-  return 'Registration failed. Please try again.';
+  if (typeof error?.data?.message === 'string' && error.data.message.trim()) {
+    return error.data.message;
+  }
+
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    return error.message;
+  }
+
+  return 'Request failed. Please try again.';
+}
+
+function normalizeGeorgianMobile(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+
+  if (/^5\d{8}$/.test(digits)) {
+    return {
+      local: digits,
+      international: `+995${digits}`,
+    };
+  }
+
+  if (/^9955\d{8}$/.test(digits)) {
+    const local = digits.slice(3);
+    return {
+      local,
+      international: `+${digits}`,
+    };
+  }
+
+  return null;
+}
+
+function saveProfileDraft({ username, mobile, age }) {
+  const payload = {
+    username: String(username || '').trim(),
+    mobile: String(mobile || '').trim(),
+    age: Number(age),
+    savedAt: Date.now(),
+  };
+
+  localStorage.setItem(PROFILE_DRAFT_KEY, JSON.stringify(payload));
 }
 
 function extractToken(payload) {
@@ -41,6 +95,115 @@ function extractToken(payload) {
 
 function extractUser(payload) {
   return payload?.user ?? payload?.data?.user ?? payload ?? null;
+}
+
+async function syncProfileAfterAuth({
+  username,
+  mobile,
+  age,
+  avatarFile,
+}) {
+  const normalizedMobile = normalizeGeorgianMobile(mobile);
+  if (!normalizedMobile) {
+    throw new Error('Please enter a valid Georgian mobile number.');
+  }
+
+  const readUser = (payload) => payload?.data ?? payload?.user ?? payload ?? {};
+  const getMobile = (user) => String(
+    user?.mobile
+    ?? user?.mobile_number
+    ?? user?.mobileNumber
+    ?? user?.phone
+    ?? user?.phone_number
+    ?? user?.phoneNumber
+    ?? user?.phone_local
+    ?? user?.mobile_local
+    ?? ''
+  ).trim();
+  const getAge = (user) => Number(user?.age ?? user?.user_age ?? user?.years ?? NaN);
+
+  async function hasRequiredProfileFields() {
+    try {
+      const userPayload = await fetchCurrentUser();
+      const user = readUser(userPayload);
+      const mobileValue = getMobile(user);
+      const ageValue = getAge(user);
+      return mobileValue.length > 0 && Number.isFinite(ageValue) && ageValue >= 16;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  const mobileCandidates = [
+    normalizedMobile.local,
+    `995${normalizedMobile.local}`,
+    normalizedMobile.international,
+  ];
+  const endpoints = ['/profile', '/me', '/user/profile'];
+  const methods = ['PUT', 'POST', 'PATCH'];
+  let lastError = null;
+  for (const mobileValue of mobileCandidates) {
+    const payloadBuilders = [
+      () => {
+        const body = new FormData();
+        body.append('full_name', username);
+        body.append('fullName', username);
+        body.append('name', username);
+        body.append('age', String(age));
+        body.append('user_age', String(age));
+        body.append('years', String(age));
+        body.append('mobile', mobileValue);
+        body.append('mobile_number', mobileValue);
+        body.append('phone', mobileValue);
+        body.append('phone_number', mobileValue);
+        body.append('mobile_local', normalizedMobile.local);
+        body.append('phone_local', normalizedMobile.local);
+        if (avatarFile) {
+          body.append('avatar', avatarFile);
+        }
+        return body;
+      },
+      () => ({
+        full_name: username,
+        fullName: username,
+        name: username,
+        age,
+        user_age: age,
+        years: age,
+        mobile: mobileValue,
+        mobile_number: mobileValue,
+        phone: mobileValue,
+        phone_number: mobileValue,
+        mobile_local: normalizedMobile.local,
+        phone_local: normalizedMobile.local,
+      }),
+      () => ({
+        full_name: username,
+        age,
+        mobile: mobileValue,
+        phone: mobileValue,
+      }),
+    ];
+
+    for (const makePayload of payloadBuilders) {
+      for (const endpoint of endpoints) {
+        for (const method of methods) {
+          try {
+            await updateProfile(makePayload(), { method, endpoint });
+            if (await hasRequiredProfileFields()) {
+              return;
+            }
+          } catch (error) {
+            lastError = error;
+          }
+        }
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
 }
 
 function createRegisterModal() {
@@ -87,6 +250,16 @@ function createRegisterModal() {
             <label for="register-username">Username*</label>
             <input id="register-username" name="username" type="text" placeholder="Username" />
           </div>
+          <div class="register-inline-fields">
+            <div class="form-group">
+              <label for="register-mobile">Mobile Number*</label>
+              <input id="register-mobile" name="mobile" type="text" placeholder="599123456" />
+            </div>
+            <div class="form-group register-age-field">
+              <label for="register-age">Age*</label>
+              <input id="register-age" name="age" type="number" min="16" max="99" placeholder="29" />
+            </div>
+          </div>
           <div class="form-group">
             <label for="register-avatar">Upload Avatar</label>
             <div class="avatar-dropzone" data-avatar-dropzone>
@@ -122,6 +295,7 @@ function createRegisterModal() {
   const avatarBrowseButton = overlay.querySelector('[data-avatar-browse]');
   const avatarPreview = overlay.querySelector('[data-avatar-preview]');
   let currentStep = 1;
+  let isSubmitting = false;
 
   switchButton.addEventListener('click', () => {
     uiStore.openModal('login');
@@ -163,6 +337,7 @@ function createRegisterModal() {
 
     backButton.hidden = currentStep === 1;
     submitButton.textContent = currentStep === 3 ? 'Sign Up' : 'Next';
+    submitButton.disabled = isSubmitting;
   }
 
   backButton.addEventListener('click', () => {
@@ -243,13 +418,19 @@ function createRegisterModal() {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
     errorBox.textContent = '';
 
     const email = form.email.value.trim();
     const password = form.password.value.trim();
     const confirmPassword = form.confirmPassword.value.trim();
     const username = form.username.value.trim();
+    const mobileRaw = form.mobile?.value?.trim() || '';
+    const ageRaw = form.age?.value?.trim() || '';
     const avatarFile = avatarInput.files?.[0];
+
+    const normalizedMobile = normalizeGeorgianMobile(mobileRaw);
+    const age = Number(ageRaw);
 
     if (currentStep === 1) {
       if (!isRequired(email) || !hasMinLength(email, 3) || !isValidEmail(email)) {
@@ -288,6 +469,16 @@ function createRegisterModal() {
       return;
     }
 
+    if (!normalizedMobile) {
+      errorBox.textContent = 'Mobile number must be 9 digits and start with 5.';
+      return;
+    }
+
+    if (!Number.isFinite(age) || age < 16) {
+      errorBox.textContent = 'Age must be at least 16.';
+      return;
+    }
+
     if (!isRequired(email) || !hasMinLength(email, 3) || !isValidEmail(email)) {
       errorBox.textContent = 'Please enter a valid email address.';
       return;
@@ -319,6 +510,14 @@ function createRegisterModal() {
     }
 
     try {
+      isSubmitting = true;
+      renderStep();
+      saveProfileDraft({
+        username,
+        mobile: normalizedMobile.local,
+        age,
+      });
+
       const response = await register(formData);
       const token = extractToken(response);
       const user = extractUser(response);
@@ -333,14 +532,37 @@ function createRegisterModal() {
         }
 
         authStore.setAuth(loginToken, loginUser);
+        try {
+          await syncProfileAfterAuth({
+            username,
+            mobile: normalizedMobile.local,
+            age,
+            avatarFile,
+          });
+        } catch (_profileError) {
+          // Registration/login already succeeded; do not block the user in modal.
+        }
         uiStore.closeModal();
         return;
       }
 
       authStore.setAuth(token, user);
+      try {
+        await syncProfileAfterAuth({
+          username,
+          mobile: normalizedMobile.local,
+          age,
+          avatarFile,
+        });
+      } catch (_profileError) {
+        // Registration/login already succeeded; do not block the user in modal.
+      }
       uiStore.closeModal();
     } catch (error) {
       errorBox.textContent = getErrorMessage(error);
+    } finally {
+      isSubmitting = false;
+      renderStep();
     }
   });
 

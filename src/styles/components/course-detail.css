@@ -114,6 +114,10 @@
   padding-top: 28px;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 .course-detail-accordion {
   border-bottom: 1px solid #ebedf4;
 }
@@ -263,42 +267,78 @@
   color: #ffffff;
 }
 
-.course-detail-profile-note {
-  margin-top: 10px;
+.course-detail-enroll-error {
+  margin: 8px 0 0;
+  min-height: 18px;
+  color: #dc2626;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.course-detail-enrolled-panel {
   border: 1px solid #ececf2;
   border-radius: 8px;
   background: #fff;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  padding: 14px 16px;
 }
 
-.course-detail-profile-note-title {
+.course-detail-enrolled-badge {
   margin: 0;
-  color: #4b4c56;
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ecebff;
+  color: #4f46e5;
+  font-size: 11px;
   font-weight: 600;
 }
 
-.course-detail-profile-note-text {
-  margin: 2px 0 0;
-  color: #8b8e9d;
-  font-size: 10px;
-  line-height: 1.35;
+.course-detail-enrolled-line {
+  margin: 10px 0 0;
+  color: #5f6272;
+  font-size: 12px;
 }
 
-.course-detail-profile-note-btn {
-  border: 1px solid #d8daf2;
-  border-radius: 999px;
-  background: #f5f6ff;
-  color: #4f46e5;
-  height: 32px;
-  min-width: 108px;
-  white-space: nowrap;
+.course-detail-enrolled-progress-text {
+  margin: 14px 0 0;
+  color: #4b4c56;
   font-size: 12px;
+  font-weight: 600;
+}
+
+.course-detail-enrolled-progressbar {
+  margin-top: 8px;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e8e9f3;
+  overflow: hidden;
+}
+
+.course-detail-enrolled-progressbar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #4f46e5;
+}
+
+.course-detail-enrolled-complete-btn {
+  margin-top: 14px;
+  width: 100%;
+  height: 42px;
+  border: none;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-size: 14px;
   cursor: pointer;
+}
+
+.course-detail-enrolled-complete-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 
 @media (max-width: 1200px) {

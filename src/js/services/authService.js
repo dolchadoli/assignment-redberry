@@ -17,4 +17,8 @@ async function fetchCurrentUser() {
   return userApi.fetchCurrentUser();
 }
 
-export { login, register, logout, fetchCurrentUser };
+async function updateProfile(payload, options) {
+  return userApi.updateProfile(payload, options);
+}
+
+export { login, register, logout, fetchCurrentUser, updateProfile };

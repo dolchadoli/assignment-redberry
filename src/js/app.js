@@ -5,7 +5,8 @@ import { uiStore } from './state/uiStore.js';
 import { logout } from './services/authService.js';
 import loginModal from './components/modals/loginModal.js';
 import registerModal from './components/modals/registerModal.js';
-import { renderEnrolledCoursesSidebarOverlay } from './components/sidebar/enrolledCoursesSidebar.js';
+import { renderEnrolledCoursesSidebarOverlay, populateEnrolledSidebar } from './components/sidebar/enrolledCoursesSidebar.js';
+import { fetchEnrollments } from './api/enrollmentsApi.js';
 import { renderDashboardPage, initDashboardPage } from './pages/dashboardPage.js';
 import { renderCatalogPage, initCatalogPage } from './pages/catalogPage.js';
 import { renderCourseDetailPage, initCourseDetailPage } from './pages/courseDetailPage.js';
@@ -13,6 +14,7 @@ import { renderNotFoundPage } from './pages/notFoundPage.js';
 
 const SIDEBAR_TRANSITION_MS = 280;
 let sidebarCloseTimer = null;
+let sidebarLoadRequestId = 0;
 
 function setPageContent(markup) {
   const pageContent = document.getElementById('page-content');
@@ -72,6 +74,20 @@ function renderSidebar() {
 
     if (existingOverlay) {
       existingOverlay.classList.add('is-open');
+      if (authStore.isAuthenticated()) {
+        const requestId = ++sidebarLoadRequestId;
+        fetchEnrollments()
+          .then((payload) => {
+            if (requestId !== sidebarLoadRequestId) return;
+            populateEnrolledSidebar(existingOverlay, payload);
+          })
+          .catch(() => {
+            if (requestId !== sidebarLoadRequestId) return;
+            populateEnrolledSidebar(existingOverlay, null, { error: true });
+          });
+      } else {
+        populateEnrolledSidebar(existingOverlay, []);
+      }
       return;
     }
 
@@ -80,6 +96,21 @@ function renderSidebar() {
     window.requestAnimationFrame(() => {
       overlay.classList.add('is-open');
     });
+
+    if (authStore.isAuthenticated()) {
+      const requestId = ++sidebarLoadRequestId;
+      fetchEnrollments()
+        .then((payload) => {
+          if (requestId !== sidebarLoadRequestId) return;
+          populateEnrolledSidebar(overlay, payload);
+        })
+        .catch(() => {
+          if (requestId !== sidebarLoadRequestId) return;
+          populateEnrolledSidebar(overlay, null, { error: true });
+        });
+    } else {
+      populateEnrolledSidebar(overlay, []);
+    }
     return;
   }
 
