@@ -1,3 +1,5 @@
+import { readJsonStorage } from '../../utils/storage.js';
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -11,25 +13,13 @@ const ENROLLMENT_PROGRESS_KEY = 'demoEnrollmentProgressMap';
 const ENROLLMENT_SELECTIONS_KEY = 'enrollmentSelectionMap';
 
 function getEnrollmentProgressMap() {
-  try {
-    const raw = localStorage.getItem(ENROLLMENT_PROGRESS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
+  const parsed = readJsonStorage(ENROLLMENT_PROGRESS_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function getEnrollmentSelectionMap() {
-  try {
-    const raw = localStorage.getItem(ENROLLMENT_SELECTIONS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
+  const parsed = readJsonStorage(ENROLLMENT_SELECTIONS_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function extractList(payload) {

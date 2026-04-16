@@ -2,6 +2,7 @@ import { uiStore } from '../../state/uiStore.js';
 import { authStore } from '../../state/authStore.js';
 import { register, login, updateProfile, fetchCurrentUser } from '../../services/authService.js';
 import { isValidEmail, isRequired, hasMinLength } from '../../utils/validators.js';
+import { writeJsonStorage } from '../../utils/storage.js';
 import { createOverlayModal } from './modalBase.js';
 
 const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -78,7 +79,7 @@ function saveProfileDraft({ username, mobile, age }) {
     savedAt: Date.now(),
   };
 
-  localStorage.setItem(PROFILE_DRAFT_KEY, JSON.stringify(payload));
+  writeJsonStorage(PROFILE_DRAFT_KEY, payload);
 }
 
 function extractToken(payload) {

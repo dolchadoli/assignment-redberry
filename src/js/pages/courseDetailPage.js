@@ -8,6 +8,7 @@ import { createEnrollment, fetchEnrollments } from '../api/enrollmentsApi.js';
 import { fetchCurrentUser, updateProfile } from '../services/authService.js';
 import { authStore } from '../state/authStore.js';
 import { uiStore } from '../state/uiStore.js';
+import { readJsonStorage, writeJsonStorage } from '../utils/storage.js';
 
 const ENROLLMENT_PROGRESS_KEY = 'demoEnrollmentProgressMap';
 const PROFILE_DRAFT_KEY = 'pendingProfileDraft';
@@ -42,44 +43,26 @@ function extractList(payload) {
 }
 
 function getEnrollmentProgressMap() {
-  try {
-    const raw = localStorage.getItem(ENROLLMENT_PROGRESS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
+  const parsed = readJsonStorage(ENROLLMENT_PROGRESS_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function getEnrollmentSelectionMap() {
-  try {
-    const raw = localStorage.getItem(ENROLLMENT_SELECTIONS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
+  const parsed = readJsonStorage(ENROLLMENT_SELECTIONS_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function setEnrollmentSelectionMap(map) {
-  localStorage.setItem(ENROLLMENT_SELECTIONS_KEY, JSON.stringify(map));
+  writeJsonStorage(ENROLLMENT_SELECTIONS_KEY, map);
 }
 
 function getEnrollmentRatingMap() {
-  try {
-    const raw = localStorage.getItem(ENROLLMENT_RATING_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
+  const parsed = readJsonStorage(ENROLLMENT_RATING_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function setEnrollmentRatingMap(map) {
-  localStorage.setItem(ENROLLMENT_RATING_KEY, JSON.stringify(map));
+  writeJsonStorage(ENROLLMENT_RATING_KEY, map);
 }
 
 function getEnrollmentProgressOverride(enrollmentId) {
@@ -92,7 +75,7 @@ function getEnrollmentProgressOverride(enrollmentId) {
 function setEnrollmentProgressOverride(enrollmentId, progress) {
   const map = getEnrollmentProgressMap();
   map[String(enrollmentId)] = Math.max(0, Math.min(100, Number(progress) || 0));
-  localStorage.setItem(ENROLLMENT_PROGRESS_KEY, JSON.stringify(map));
+  writeJsonStorage(ENROLLMENT_PROGRESS_KEY, map);
 }
 
 function formatTime(value) {
@@ -304,14 +287,8 @@ function normalizeGeorgianMobile(value) {
 }
 
 function readProfileDraft() {
-  try {
-    const raw = localStorage.getItem(PROFILE_DRAFT_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (_error) {
-    return null;
-  }
+  const parsed = readJsonStorage(PROFILE_DRAFT_KEY, null);
+  return parsed && typeof parsed === 'object' ? parsed : null;
 }
 
 function setAccordionItemState(item, isOpen) {
@@ -596,6 +573,18 @@ async function initCourseDetailPage(params = {}) {
       const starValue = Number(button.dataset.ratingStar);
       button.classList.toggle('is-active', Number.isFinite(starValue) && starValue <= normalized);
     });
+  }
+
+  async function resolveCurrentEnrollmentFromPayload(enrollmentPayload) {
+    const createdEnrollment = extractRecord(enrollmentPayload);
+    if (createdEnrollment) {
+      currentEnrollment = createdEnrollment;
+      return;
+    }
+
+    const enrollmentsPayload = await fetchEnrollments();
+    const enrollments = extractList(enrollmentsPayload);
+    currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
   }
 
   async function tryRepairProfileFromDraft() {
@@ -964,15 +953,7 @@ async function initCourseDetailPage(params = {}) {
         });
 
         isEnrolledInCurrentSelection = true;
-
-        const createdEnrollment = extractRecord(enrollmentPayload);
-        if (createdEnrollment) {
-          currentEnrollment = createdEnrollment;
-        } else {
-          const enrollmentsPayload = await fetchEnrollments();
-          const enrollments = extractList(enrollmentsPayload);
-          currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
-        }
+        await resolveCurrentEnrollmentFromPayload(enrollmentPayload);
 
         persistSelectionForEnrollment(currentEnrollment);
 
@@ -996,14 +977,7 @@ async function initCourseDetailPage(params = {}) {
                 sessionTypeId: selectedSessionType.id,
               });
 
-              const retryCreated = extractRecord(retryEnrollmentPayload);
-              if (retryCreated) {
-                currentEnrollment = retryCreated;
-              } else {
-                const enrollmentsPayload = await fetchEnrollments();
-                const enrollments = extractList(enrollmentsPayload);
-                currentEnrollment = enrollments.find((enrollment) => getEnrollmentCourseId(enrollment) === Number(courseId)) || null;
-              }
+              await resolveCurrentEnrollmentFromPayload(retryEnrollmentPayload);
 
               persistSelectionForEnrollment(currentEnrollment);
 

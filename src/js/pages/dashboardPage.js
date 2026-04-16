@@ -24,48 +24,26 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
-function extractCourses(payload) {
+function extractArray(payload, keys = []) {
   if (Array.isArray(payload)) {
     return payload;
   }
 
-  if (Array.isArray(payload?.data)) {
-    return payload.data;
-  }
-
-  if (Array.isArray(payload?.courses)) {
-    return payload.courses;
-  }
-
-  if (Array.isArray(payload?.items)) {
-    return payload.items;
+  for (const key of keys) {
+    if (Array.isArray(payload?.[key])) {
+      return payload[key];
+    }
   }
 
   return [];
 }
 
+function extractCourses(payload) {
+  return extractArray(payload, ['data', 'courses', 'items']);
+}
+
 function extractEnrollments(payload) {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  if (Array.isArray(payload?.data)) {
-    return payload.data;
-  }
-
-  if (Array.isArray(payload?.enrollments)) {
-    return payload.enrollments;
-  }
-
-  if (Array.isArray(payload?.results)) {
-    return payload.results;
-  }
-
-  if (Array.isArray(payload?.items)) {
-    return payload.items;
-  }
-
-  return [];
+  return extractArray(payload, ['data', 'enrollments', 'results', 'items']);
 }
 
 function getCourseImage(course) {
