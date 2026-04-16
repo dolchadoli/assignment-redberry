@@ -12,6 +12,7 @@ import { uiStore } from '../state/uiStore.js';
 const ENROLLMENT_PROGRESS_KEY = 'demoEnrollmentProgressMap';
 const PROFILE_DRAFT_KEY = 'pendingProfileDraft';
 const ENROLLMENT_SELECTIONS_KEY = 'enrollmentSelectionMap';
+const ENROLLMENT_RATING_KEY = 'enrollmentRatingMap';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -64,6 +65,21 @@ function getEnrollmentSelectionMap() {
 
 function setEnrollmentSelectionMap(map) {
   localStorage.setItem(ENROLLMENT_SELECTIONS_KEY, JSON.stringify(map));
+}
+
+function getEnrollmentRatingMap() {
+  try {
+    const raw = localStorage.getItem(ENROLLMENT_RATING_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function setEnrollmentRatingMap(map) {
+  localStorage.setItem(ENROLLMENT_RATING_KEY, JSON.stringify(map));
 }
 
 function getEnrollmentProgressOverride(enrollmentId) {
@@ -192,6 +208,17 @@ function getStoredEnrollmentSelection(enrollment) {
     map[`enrollment:${enrollmentId}`]
     || map[`course:${courseId}`]
     || null
+  );
+}
+
+function getStoredEnrollmentRating(enrollment) {
+  const map = getEnrollmentRatingMap();
+  const enrollmentId = enrollment?.id;
+  const courseId = getEnrollmentCourseId(enrollment);
+  return Number(
+    map[`enrollment:${enrollmentId}`]
+    ?? map[`course:${courseId}`]
+    ?? 0
   );
 }
 
@@ -371,7 +398,7 @@ function renderCourseDetailPage(params = {}) {
           </div>
 
           <div class="course-detail-enrolled-panel is-hidden" data-enrolled-panel>
-            <p class="course-detail-enrolled-badge">Enrolled</p>
+            <p class="course-detail-enrolled-badge" data-enrolled-badge>Enrolled</p>
             <p class="course-detail-enrolled-line" data-enrolled-schedule>Schedule selected</p>
             <p class="course-detail-enrolled-line" data-enrolled-time>Time selected</p>
             <p class="course-detail-enrolled-line" data-enrolled-session>Session selected</p>
@@ -379,6 +406,19 @@ function renderCourseDetailPage(params = {}) {
             <p class="course-detail-enrolled-progress-text"><span data-enrolled-progress>0%</span> Complete</p>
             <div class="course-detail-enrolled-progressbar"><span data-enrolled-progress-fill style="width: 0%"></span></div>
             <button type="button" class="course-detail-enrolled-complete-btn" data-complete-course-btn>Complete Course</button>
+            <button type="button" class="course-detail-enrolled-retake-btn is-hidden" data-retake-course-btn>Retake Course</button>
+            <div class="course-detail-rating-panel is-hidden" data-rating-panel>
+              <button type="button" class="course-detail-rating-close" data-rating-close aria-label="Close rating panel">&times;</button>
+              <p class="course-detail-rating-title">Rate your experience</p>
+              <div class="course-detail-rating-stars" data-rating-stars>
+                <button type="button" class="course-detail-rating-star" data-rating-star="1" aria-label="Rate 1 star">&#9733;</button>
+                <button type="button" class="course-detail-rating-star" data-rating-star="2" aria-label="Rate 2 stars">&#9733;</button>
+                <button type="button" class="course-detail-rating-star" data-rating-star="3" aria-label="Rate 3 stars">&#9733;</button>
+                <button type="button" class="course-detail-rating-star" data-rating-star="4" aria-label="Rate 4 stars">&#9733;</button>
+                <button type="button" class="course-detail-rating-star" data-rating-star="5" aria-label="Rate 5 stars">&#9733;</button>
+              </div>
+            </div>
+            <p class="course-detail-rating-thanks is-hidden" data-rating-thanks>Thank you for your feedback.</p>
           </div>
         </aside>
       </div>
@@ -415,6 +455,7 @@ async function initCourseDetailPage(params = {}) {
   const accordionRoot = root.querySelector('[data-accordion-root]');
   const selectionPanel = root.querySelector('[data-selection-panel]');
   const enrolledPanel = root.querySelector('[data-enrolled-panel]');
+  const enrolledBadgeNode = root.querySelector('[data-enrolled-badge]');
   const enrolledScheduleNode = root.querySelector('[data-enrolled-schedule]');
   const enrolledTimeNode = root.querySelector('[data-enrolled-time]');
   const enrolledSessionNode = root.querySelector('[data-enrolled-session]');
@@ -422,6 +463,10 @@ async function initCourseDetailPage(params = {}) {
   const enrolledProgressNode = root.querySelector('[data-enrolled-progress]');
   const enrolledProgressFillNode = root.querySelector('[data-enrolled-progress-fill]');
   const completeCourseBtn = root.querySelector('[data-complete-course-btn]');
+  const retakeCourseBtn = root.querySelector('[data-retake-course-btn]');
+  const ratingPanel = root.querySelector('[data-rating-panel]');
+  const ratingStarsRoot = root.querySelector('[data-rating-stars]');
+  const ratingThanksNode = root.querySelector('[data-rating-thanks]');
 
   let basePrice = 0;
   let selectedWeeklyId = null;
@@ -434,6 +479,7 @@ async function initCourseDetailPage(params = {}) {
   let isEnrolledInCurrentSelection = false;
   let currentEnrollment = null;
   let enrollErrorMessage = '';
+  let currentRating = 0;
 
   function getErrorMessage(error) {
     const fallback = 'Enrollment failed. Please try again.';
@@ -513,6 +559,43 @@ async function initCourseDetailPage(params = {}) {
       map[`course:${mappedCourseId}`] = snapshot;
     }
     setEnrollmentSelectionMap(map);
+  }
+
+  function persistRatingForEnrollment(enrollment, ratingValue) {
+    if (!enrollment) return;
+    const map = getEnrollmentRatingMap();
+    const enrollmentId = enrollment?.id;
+    const mappedCourseId = getEnrollmentCourseId(enrollment);
+    const normalized = Math.max(0, Math.min(5, Number(ratingValue) || 0));
+
+    if (enrollmentId !== null && enrollmentId !== undefined) {
+      map[`enrollment:${enrollmentId}`] = normalized;
+    }
+    if (Number.isFinite(mappedCourseId)) {
+      map[`course:${mappedCourseId}`] = normalized;
+    }
+    setEnrollmentRatingMap(map);
+  }
+
+  function clearRatingForEnrollment(enrollment) {
+    if (!enrollment) return;
+    const map = getEnrollmentRatingMap();
+    const enrollmentId = enrollment?.id;
+    const mappedCourseId = getEnrollmentCourseId(enrollment);
+
+    delete map[`enrollment:${enrollmentId}`];
+    delete map[`course:${mappedCourseId}`];
+    setEnrollmentRatingMap(map);
+  }
+
+  function renderRatingStars(ratingValue) {
+    if (!(ratingStarsRoot instanceof HTMLElement)) return;
+    const normalized = Math.max(0, Math.min(5, Number(ratingValue) || 0));
+    ratingStarsRoot.querySelectorAll('[data-rating-star]').forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      const starValue = Number(button.dataset.ratingStar);
+      button.classList.toggle('is-active', Number.isFinite(starValue) && starValue <= normalized);
+    });
   }
 
   async function tryRepairProfileFromDraft() {
@@ -607,14 +690,33 @@ async function initCourseDetailPage(params = {}) {
       enrolledProgressFillNode.style.width = `${progress}%`;
     }
 
+    currentRating = getStoredEnrollmentRating(currentEnrollment);
+    renderRatingStars(currentRating);
+
+    if (enrolledBadgeNode instanceof HTMLElement) {
+      const isCompleted = progress >= 100;
+      enrolledBadgeNode.textContent = isCompleted ? 'Completed' : 'Enrolled';
+      enrolledBadgeNode.classList.toggle('is-completed', isCompleted);
+    }
+
     if (completeCourseBtn instanceof HTMLButtonElement) {
-      if (progress >= 100) {
-        completeCourseBtn.textContent = 'Completed ✓';
-        completeCourseBtn.disabled = true;
-      } else {
-        completeCourseBtn.textContent = 'Complete Course';
-        completeCourseBtn.disabled = false;
-      }
+      completeCourseBtn.classList.toggle('is-hidden', progress >= 100);
+      completeCourseBtn.textContent = 'Complete Course';
+      completeCourseBtn.disabled = false;
+    }
+
+    if (retakeCourseBtn instanceof HTMLButtonElement) {
+      retakeCourseBtn.classList.toggle('is-hidden', progress < 100);
+    }
+
+    if (ratingPanel instanceof HTMLElement) {
+      const shouldShow = progress >= 100 && currentRating === 0;
+      ratingPanel.classList.toggle('is-hidden', !shouldShow);
+    }
+
+    if (ratingThanksNode instanceof HTMLElement) {
+      const shouldShowThanks = progress >= 100 && currentRating > 0;
+      ratingThanksNode.classList.toggle('is-hidden', !shouldShowThanks);
     }
   }
 
@@ -946,6 +1048,44 @@ async function initCourseDetailPage(params = {}) {
         progress: next,
       };
       renderEnrolledPanel();
+      return;
+    }
+
+    if (target.closest('[data-retake-course-btn]')) {
+      if (!currentEnrollment) return;
+      const enrollmentId = currentEnrollment?.id || getEnrollmentCourseId(currentEnrollment);
+      setEnrollmentProgressOverride(enrollmentId, 0);
+      clearRatingForEnrollment(currentEnrollment);
+      currentRating = 0;
+      currentEnrollment = {
+        ...currentEnrollment,
+        progress: 0,
+      };
+      renderEnrolledPanel();
+      return;
+    }
+
+    if (target.closest('[data-rating-close]')) {
+      if (ratingPanel instanceof HTMLElement) {
+        ratingPanel.classList.add('is-hidden');
+      }
+      return;
+    }
+
+    const ratingStarButton = target.closest('[data-rating-star]');
+    if (ratingStarButton instanceof HTMLButtonElement) {
+      if (!currentEnrollment) return;
+      const selectedRating = Number(ratingStarButton.dataset.ratingStar);
+      if (!Number.isFinite(selectedRating) || selectedRating < 1 || selectedRating > 5) return;
+      currentRating = selectedRating;
+      persistRatingForEnrollment(currentEnrollment, selectedRating);
+      renderRatingStars(selectedRating);
+      if (ratingPanel instanceof HTMLElement) {
+        ratingPanel.classList.add('is-hidden');
+      }
+      if (ratingThanksNode instanceof HTMLElement) {
+        ratingThanksNode.classList.remove('is-hidden');
+      }
       return;
     }
 
