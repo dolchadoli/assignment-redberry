@@ -1,4 +1,5 @@
 import { fetchCourses, fetchFeaturedCourses } from '../api/coursesApi.js';
+import { fetchEnrollments } from '../api/enrollmentsApi.js';
 import { authStore } from '../state/authStore.js';
 
 const HERO_SLIDES = [
@@ -34,6 +35,30 @@ function extractCourses(payload) {
 
   if (Array.isArray(payload?.courses)) {
     return payload.courses;
+  }
+
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  return [];
+}
+
+function extractEnrollments(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  if (Array.isArray(payload?.enrollments)) {
+    return payload.enrollments;
+  }
+
+  if (Array.isArray(payload?.results)) {
+    return payload.results;
   }
 
   if (Array.isArray(payload?.items)) {
@@ -82,6 +107,61 @@ function getCoursePrice(course) {
 function getCourseRating(course) {
   const rawRating = Number(course?.rating);
   return Number.isFinite(rawRating) ? rawRating.toFixed(1) : '4.9';
+}
+
+function getEnrollmentCourse(enrollment) {
+  return enrollment?.course || enrollment?.course_data || enrollment;
+}
+
+function getEnrollmentCourseId(enrollment) {
+  return Number(
+    enrollment?.course?.id
+    ?? enrollment?.course_id
+    ?? enrollment?.courseId
+    ?? enrollment?.id
+  );
+}
+
+function getEnrollmentProgress(enrollment) {
+  const raw = Number(enrollment?.progress ?? enrollment?.progress_percentage ?? 0);
+  return Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
+}
+
+function renderContinueLearningCards(enrollments) {
+  return enrollments.map((enrollment) => {
+    const course = getEnrollmentCourse(enrollment);
+    const courseId = getEnrollmentCourseId(enrollment);
+    const image = escapeHtml(getCourseImage(course));
+    const title = escapeHtml(getCourseTitle(course));
+    const instructor = escapeHtml(getCourseInstructor(course));
+    const rating = escapeHtml(getCourseRating(course));
+    const progress = getEnrollmentProgress(enrollment);
+    const detailsLink = Number.isFinite(courseId) && courseId > 0 ? `#/courses/${courseId}` : '#/courses';
+
+    return `
+      <article class="dashboard-continue-card">
+        <div class="dashboard-continue-card-toprow">
+          <img class="dashboard-continue-image" src="${image}" alt="${title}" />
+          <div class="dashboard-continue-main">
+            <div class="dashboard-continue-top">
+              <p class="dashboard-continue-instructor">${instructor}</p>
+              <p class="dashboard-continue-rating"><span>&#9733;</span> ${rating}</p>
+            </div>
+            <h3 class="dashboard-continue-title">${title}</h3>
+          </div>
+        </div>
+        <div class="dashboard-continue-card-footer">
+          <div class="dashboard-continue-progress-wrap">
+            <p class="dashboard-continue-progress-text">${progress}% Complete</p>
+            <div class="dashboard-continue-progressbar">
+              <span style="width: ${progress}%"></span>
+            </div>
+          </div>
+          <a class="dashboard-continue-view" href="${detailsLink}">View</a>
+        </div>
+      </article>
+    `;
+  }).join('');
 }
 
 function renderCourseCards(courses) {
@@ -144,6 +224,31 @@ async function loadStartLearningCourses() {
   }
 }
 
+async function loadContinueLearningCourses() {
+  const section = document.querySelector('[data-continue-learning-section]');
+  const cardsRoot = document.querySelector('[data-continue-learning-cards]');
+  if (!(section instanceof HTMLElement) || !(cardsRoot instanceof HTMLElement)) {
+    return;
+  }
+
+  section.classList.add('is-hidden');
+
+  try {
+    const payload = await fetchEnrollments();
+    const enrollments = extractEnrollments(payload).slice(0, 3);
+
+    if (enrollments.length === 0) {
+      cardsRoot.innerHTML = '';
+      return;
+    }
+
+    cardsRoot.innerHTML = renderContinueLearningCards(enrollments);
+    section.classList.remove('is-hidden');
+  } catch (_error) {
+    cardsRoot.innerHTML = '';
+  }
+}
+
 function renderDashboardPage() {
   const continueLearningLockedMarkup = authStore.isAuthenticated()
     ? ''
@@ -156,6 +261,21 @@ function renderDashboardPage() {
         </div>
       </section>
     `;
+
+  const continueLearningMarkup = authStore.isAuthenticated()
+    ? `
+      <section class="dashboard-continue-learning is-hidden" data-continue-learning-section>
+        <div class="dashboard-continue-learning-head">
+          <div>
+            <h2 class="dashboard-continue-learning-title">Continue Learning</h2>
+            <p class="dashboard-continue-learning-subtitle">Pick up where you left off</p>
+          </div>
+          <button type="button" class="dashboard-continue-learning-see-all btn-enrolled">See All</button>
+        </div>
+        <div class="dashboard-continue-grid" data-continue-learning-cards></div>
+      </section>
+    `
+    : '';
 
   const slidesMarkup = HERO_SLIDES.map((src, index) => {
     const alt = index === 0 ? 'Featured course slider item 1' : 'Featured course slider item 2';
@@ -198,6 +318,7 @@ function renderDashboardPage() {
         </div>
       </div>
 
+      ${continueLearningMarkup}
       <section class="dashboard-start-learning">
         <h2 class="dashboard-start-learning-title">Start Learning Today</h2>
         <p class="dashboard-start-learning-subtitle">Choose from our most popular courses and begin your journey</p>
@@ -281,6 +402,9 @@ function initDashboardPage() {
 
   setActiveSlide(0);
   loadStartLearningCourses();
+  if (authStore.isAuthenticated()) {
+    loadContinueLearningCourses();
+  }
 }
 
 export { renderDashboardPage, initDashboardPage };
